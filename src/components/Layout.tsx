@@ -31,13 +31,13 @@ export function Layout() {
     <a className="skip-link" href="#main">Перейти к содержимому</a>
     <header className="site-header"><div className="container header-inner">
       <Brand />
-      <nav className="desktop-nav" aria-label="Основная навигация">{navLinks.map(link => <NavLink key={link.to} to={link.to} className={link.to === '/challenge' ? 'nav-task' : undefined}>{link.text}</NavLink>)}</nav>
+      <nav className="desktop-nav" aria-label="Основная навигация">{navLinks.map(link => <NavLink key={link.to} to={link.to} className={link.to === '/challenge' ? 'nav-task' : undefined}>{link.text}</NavLink>)}{data.user?.isAdmin && <NavLink to="/admin">Админка</NavLink>}</nav>
       <div className="auth-status">{checking ? <span className="small" role="status">Входим…</span> : data.user ? <Link className="account-chip" to="/account" aria-label={`Личный кабинет: ${data.user.fullName}`}><UserRound size={20}/><span><strong>{data.user.fullName}</strong><small>В АККАУНТЕ · КАБИНЕТ</small></span></Link> : <Link className="button button-small" to="/login">{error ? 'Проверить вход' : 'Войти'}</Link>}</div>
       <button className="icon-button menu-trigger" aria-label="Открыть меню" aria-expanded={menuOpen} aria-controls="mobile-menu" onClick={() => { menu.current?.showModal(); setMenuOpen(true); }}><Menu /></button>
     </div></header>
     <dialog ref={menu} id="mobile-menu" className="mobile-menu" aria-label="Навигация" onClose={() => setMenuOpen(false)}>
       <div className="menu-top"><Brand /><button className="icon-button" aria-label="Закрыть меню" onClick={() => menu.current?.close()}><X /></button></div>
-      <nav aria-label="Мобильная навигация">{navLinks.map(link => <Link key={link.to} to={link.to}>{link.text}<ArrowUpRight size={20} aria-hidden="true" /></Link>)}<Link to={data.user ? '/account' : '/login'}>{data.user ? `Кабинет · ${data.user.fullName}` : 'Войти на сайт'}<ArrowUpRight size={20} aria-hidden="true" /></Link></nav>
+      <nav aria-label="Мобильная навигация">{navLinks.map(link => <Link key={link.to} to={link.to}>{link.text}<ArrowUpRight size={20} aria-hidden="true" /></Link>)}{data.user?.isAdmin && <Link to="/admin">Админка<ArrowUpRight size={20} aria-hidden="true" /></Link>}<Link to={data.user ? '/account' : '/login'}>{data.user ? `Кабинет · ${data.user.fullName}` : 'Войти на сайт'}<ArrowUpRight size={20} aria-hidden="true" /></Link></nav>
     </dialog>
     <main id="main"><Outlet /></main>
     <footer className="site-footer"><div className="container">

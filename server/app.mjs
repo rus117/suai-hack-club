@@ -59,7 +59,7 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
   });
   app.use('/api', limit('api', 1200));
   app.use('/api', sessionMiddleware(db, { secure: production, now }));
-  app.get('/api/session', (req, res) => res.json({ csrf: req.session.csrf, admin: Boolean(req.session.is_admin) }));
+  app.get('/api/session', (req, res) => res.json({ csrf: req.session.csrf, admin: Boolean(req.session.is_admin || req.accountAdmin), viaAccount: Boolean(req.accountAdmin) }));
 
   app.get('/api/participant', (req, res) => {
     const participants = events.map(event => access.find(req, event.id)).filter(Boolean)
@@ -133,8 +133,20 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
     res.json({ csrf, admin: true });
   });
   app.post('/api/admin/logout', requireCsrf, (req, res) => {
+    if (req.accountAdmin) {
+      const raw = req.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith('suai_account='))?.slice(13);
+      if (raw) db.prepare('DELETE FROM account_sessions WHERE token_hash=?').run(digest(raw));
+      res.clearCookie('suai_account', { path: '/' });
+    }
     db.prepare('DELETE FROM sessions WHERE id=?').run(req.session.id);
     res.clearCookie('suai_session', { path: '/' });
+    res.json({ ok: true });
+  });
+  app.post('/api/admin/organizer-account', requireCsrf, (req, res) => {
+    if (!req.session.is_admin) return res.status(403).json({ error: 'Войди с паролем организатора для привязки аккаунта.' });
+    const account = db.prepare("SELECT id FROM accounts WHERE telegram='@ryctam9'").get();
+    if (!account) return res.status(404).json({ error: 'Сначала создай аккаунт @Ryctam9 на сайте.' });
+    db.prepare('UPDATE accounts SET is_admin=1 WHERE id=?').run(account.id);
     res.json({ ok: true });
   });
   const adminRows = () => db.prepare(`SELECT r.id, r.event_id AS eventId, r.full_name AS fullName,

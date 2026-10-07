@@ -30,11 +30,11 @@ export function accounts(app, db, { now, production, limit, access }) {
       (SELECT count(*) FROM submissions WHERE registration_id=r.id AND challenge_id='${CHALLENGE_ID}') AS submissions,
       (SELECT max(public_score) FROM submissions WHERE registration_id=r.id AND challenge_id='${CHALLENGE_ID}') AS score
       FROM registrations r WHERE r.account_id=?`).all(account.id);
-    return { user: { id: account.id, fullName: account.full_name, telegram: account.telegram }, registrations };
+    return { user: { id: account.id, fullName: account.full_name, telegram: account.telegram, isAdmin: Boolean(account.is_admin) }, registrations };
   }
   function create({ telegram, fullName, password }) {
     const account = { id: randomUUID(), telegram, full_name: fullName };
-    db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?)').run(account.id, telegram, fullName, hashPassword(password), '2026-10-07', now().toISOString());
+    db.prepare('INSERT INTO accounts (id,telegram,full_name,password_hash,consent_version,created_at) VALUES (?,?,?,?,?,?)').run(account.id, telegram, fullName, hashPassword(password), '2026-10-07', now().toISOString());
     return account;
   }
   function linkLegacy(account) {

@@ -104,3 +104,28 @@ test('home screenshots and mobile menu keyboard interaction', async ({ page }) =
   await expect(page.getByRole('dialog')).toBeVisible(); await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible(); await expect(trigger).toBeFocused();
 });
+
+test('organizer account shows the admin link after a password-protected grant', async ({ page }) => {
+  await page.goto('/signup');
+  await page.getByLabel('Имя и фамилия').fill('Организатор Клуба');
+  await page.locator('input[name="telegram"]').fill('@Ryctam9');
+  await page.locator('input[name="password"]').fill('organizer-test-password');
+  await page.locator('input[name="consent"]').check();
+  await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+  await expect(page.getByRole('heading', { name: 'Привет, Организатор Клуба.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Открыть админку' })).toHaveCount(0);
+  await page.goto('/admin');
+  await page.locator('input[name="password"]').fill('browser-test-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await page.getByRole('button', { name: 'Дать @Ryctam9 доступ к админке' }).click();
+  await expect(page.getByText('Аккаунт @Ryctam9 получил доступ к админке.')).toBeVisible();
+  await page.getByRole('button', { name: 'Выйти' }).click();
+  await expect(page.getByRole('heading', { name: 'Вход на сайт' })).toBeVisible();
+  await page.locator('input[name="telegram"]').fill('@Ryctam9');
+  await page.locator('input[name="password"]').fill('organizer-test-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Открыть админку' })).toBeVisible();
+  await page.getByRole('link', { name: 'Открыть админку' }).click();
+  await expect(page.getByRole('heading', { name: 'Всё под рукой.' })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});

@@ -29,6 +29,10 @@ export function sessionMiddleware(db, { secure, now }) {
       res.cookie('suai_session', newToken, { httpOnly: true, secure, sameSite: 'strict', maxAge: 12 * 60 * 60 * 1000, path: '/' });
     }
     req.session = session;
+    const accountCookie = req.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith('suai_account='));
+    const accountToken = accountCookie?.slice('suai_account='.length);
+    req.accountAdmin = Boolean(accountToken && db.prepare(`SELECT a.is_admin FROM account_sessions s
+      JOIN accounts a ON a.id=s.account_id WHERE s.token_hash=? AND s.expires>?`).get(digest(accountToken), current)?.is_admin);
     next();
   };
 }
@@ -59,6 +63,6 @@ export function requireCsrf(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (!req.session.is_admin) return res.status(401).json({ error: 'Войди как организатор.' });
+  if (!req.session.is_admin && !req.accountAdmin) return res.status(401).json({ error: 'Войди как организатор.' });
   next();
 }

@@ -4,7 +4,7 @@ export type HackEvent = {
   description: string; tags: string[]; hasChallenge: boolean; steps: string[]; detail: string;
   open?: boolean;
 };
-export type Session = { csrf: string; admin: boolean };
+export type Session = { csrf: string; admin: boolean; viaAccount?: boolean };
 export type Leaderboard = { final: boolean; entries: { rank: number; name: string; score: number; submittedAt: string; attempts: number }[] };
 export type Registration = {
   id: string; eventId: string; fullName: string; telegram: string; displayName: string;

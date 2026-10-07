@@ -194,3 +194,26 @@ test('legacy recovery creates an account and a linked application without losing
   assert.equal((await f.call('/api/auth/login',{telegram:registration.telegram,password})).status,200);
   assert.equal((await f.submit()).status,201);
 });
+
+test('organizer role requires the existing admin password and belongs to the account session', async t => {
+  const f = await fixture(t, { account: false });
+  assert.equal((await f.signup({ telegram: '@ryctam9' })).status, 201);
+  assert.equal((await (await f.call('/api/auth/me')).json()).user.isAdmin, false);
+  assert.equal((await f.call('/api/admin/registrations')).status, 401);
+  assert.equal((await f.call('/api/admin/organizer-account', {})).status, 403);
+  await f.login();
+  assert.equal((await f.call('/api/admin/organizer-account', {}, 'POST', { 'x-csrf-token': '' })).status, 403);
+  assert.equal((await f.call('/api/admin/organizer-account', {})).status, 200);
+  assert.equal((await (await f.call('/api/auth/me')).json()).user.isAdmin, true);
+  assert.equal((await f.call('/api/admin/registrations')).status, 200);
+  assert.equal((await f.call('/api/admin/logout', {})).status, 200);
+  assert.equal((await f.call('/api/admin/registrations')).status, 401);
+  await f.session();
+  assert.equal((await f.call('/api/auth/login', { telegram: '@ryctam9', password })).status, 200);
+  assert.equal((await f.call('/api/admin/registrations')).status, 200);
+  assert.equal((await f.call('/api/auth/logout', {})).status, 200);
+  assert.equal((await f.call('/api/admin/registrations')).status, 401);
+  assert.equal((await f.signup({ telegram: '@another_user' })).status, 201);
+  assert.equal((await (await f.call('/api/auth/me')).json()).user.isAdmin, false);
+  assert.equal((await f.call('/api/admin/registrations')).status, 401);
+});

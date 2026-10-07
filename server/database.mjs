@@ -53,6 +53,9 @@ export function openDatabase(path) {
       key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL
     );
   `);
+  if (!db.prepare('PRAGMA table_info(accounts)').all().some(column => column.name === 'is_admin')) {
+    db.exec('ALTER TABLE accounts ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
+  }
   if (!db.prepare('PRAGMA table_info(registrations)').all().some(column => column.name === 'account_id')) {
     db.exec('ALTER TABLE registrations ADD COLUMN account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL');
   }

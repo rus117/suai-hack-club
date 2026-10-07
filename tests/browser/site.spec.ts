@@ -3,16 +3,25 @@ import AxeBuilder from '@axe-core/playwright';
 
 test('participant registers, submits CSV, appears in leaderboard; admin manages the real application', async ({ page, browser }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  test.setTimeout(60000);
   await page.goto('/register');
+  await expect(page.getByRole('heading', {name:'Вход на сайт'})).toBeVisible();
+  await page.getByRole('link',{name:'Создать аккаунт',exact:true}).click();
   await page.getByLabel('Имя и фамилия').fill('Анна Тестовая');
   await page.locator('input[name="telegram"]').fill('@anna_test');
+  await page.locator('input[name="password"]').fill('participant-test-password');
+  await page.locator('input[name="consent"]').check();
+  await page.getByRole('button',{name:'Создать аккаунт',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Займи своё место в команде.'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Личный кабинет: Анна Тестовая'})).toBeVisible();
+  await expect(page.locator('input[name="telegram"]')).toHaveValue('@anna_test');
   await page.getByLabel('Ник участника').fill('anna_ml');
   await page.locator('input[name="consent"]').check();
   await page.getByRole('button', { name: 'Зарегистрироваться', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Заявка принята.' })).toBeVisible();
   await expect(page.locator('.receipt-code')).toHaveCount(0);
   const cookies = await page.context().cookies();
-  expect(cookies.find(c => c.name === 'suai_participant_start')?.httpOnly).toBe(true);
+  expect(cookies.find(c => c.name === 'suai_account')?.httpOnly).toBe(true);
   await page.getByRole('link', { name: 'Перейти к заданию' }).click();
   await page.reload();
   await expect(page.getByText('Участник: anna_ml.', { exact: false })).toBeVisible();
@@ -22,6 +31,22 @@ test('participant registers, submits CSV, appears in leaderboard; admin manages 
   await page.locator('input[type="file"]').setInputFiles({ name: 'submission.csv', mimeType: 'text/csv', buffer: csv });
   await page.locator('.submission-form button').click();
   await expect(page.locator('.submission-form [role="status"]')).toBeVisible();
+  await page.goto('/account');
+  await expect(page.getByText(/Решение принято · отправок: 1/)).toBeVisible();
+  await page.getByRole('button',{name:'Выйти',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Вход на сайт'})).toBeVisible();
+  await page.locator('input[name="telegram"]').fill('@anna_test');
+  await page.locator('input[name="password"]').fill('participant-test-password');
+  await page.getByRole('button',{name:'Войти',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Привет, Анна Тестовая.'})).toBeVisible();
+  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+  for (const width of [320,375,768,900,1280]) {
+    await page.setViewportSize({width,height:900});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth), `account at ${width}`).toBeTruthy();
+  }
+  await page.setViewportSize({width:375,height:900});
+  await page.screenshot({path:'test-results/account-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:900});
   await page.goto('/leaderboard'); await expect(page.getByRole('cell', { name: 'anna_ml' })).toBeVisible();
   await page.goto('/admin'); await page.locator('input[name="password"]').fill('browser-test-password');
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
@@ -39,15 +64,18 @@ test('participant registers, submits CSV, appears in leaderboard; admin manages 
     const participant = await otherDevice.newPage();
     await participant.goto(recoveryLink);
     await expect(participant).toHaveURL(/\/restore$/);
-    await participant.getByRole('button', { name: 'Продолжить участие' }).click();
+    await participant.locator('input[name="password"]').fill('recovered-test-password');
+    await participant.getByRole('button', { name: 'Сохранить пароль и войти' }).click();
     await expect(participant.getByRole('heading', { name: 'Ты снова с нами.' })).toBeVisible();
-    await participant.getByRole('link', { name: 'Перейти к заданию' }).click();
+    await participant.getByRole('link', { name: 'Открыть кабинет' }).click();
+    await participant.getByRole('link', { name: 'Посмотреть задание', exact:true }).click();
     await expect(participant.getByText('Участник: anna_ml.', { exact: false })).toBeVisible();
     await participant.setViewportSize({ width: 375, height: 900 });
     expect((await new AxeBuilder({ page: participant }).analyze()).violations).toEqual([]);
     await participant.screenshot({ path: 'test-results/participant-mobile.png', fullPage: true });
     await participant.goto(recoveryLink);
-    await participant.getByRole('button', { name: 'Продолжить участие' }).click();
+    await participant.locator('input[name="password"]').fill('recovered-test-password');
+    await participant.getByRole('button', { name: 'Сохранить пароль и войти' }).click();
     await expect(participant.getByRole('alert')).toContainText('Ссылка уже использована');
   } finally { await otherDevice.close(); }
   await page.getByRole('button', { name: 'Выйти' }).click();
@@ -57,7 +85,7 @@ test('participant registers, submits CSV, appears in leaderboard; admin manages 
 
 test('pages are accessible and fit narrow screens', async ({ page }) => {
   test.setTimeout(120000);
-  for (const route of ['/', '/register', '/challenge', '/prepare', '/prepare/honest-validation', '/leaderboard', '/admin', '/events/start', '/events/vibe', '/privacy', '/restore']) {
+  for (const route of ['/', '/register', '/challenge', '/prepare', '/prepare/honest-validation', '/leaderboard', '/admin', '/events/start', '/events/vibe', '/privacy', '/restore', '/login', '/signup']) {
     await page.goto(route); await expect(page.locator('h1')).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations, route).toEqual([]);
     for (const width of [320, 375, 768, 1280]) {

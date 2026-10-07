@@ -21,16 +21,17 @@ export function Home() {
       <div className="hero-copy"><div className="eyebrow"><span className="tiny-square" /> СТУДЕНЧЕСКОЕ СООБЩЕСТВО · ОСЕНЬ 2026</div>
         <h1 tabIndex={-1}>Твоя идея.<br />Твоя команда.<br /><span>Твой проект.</span></h1>
         <p className="hero-description">Два хакатона этой осенью. Машинное обучение и разработка с ИИ — в кругу людей, которым тоже хочется что-то создать.</p>
-        <div className="hero-actions"><a href="#events" className="button">Выбрать хакатон <ArrowDown size={18} aria-hidden="true" /></a><Link to="/prepare" className="text-link">Начать подготовку <ArrowUpRight size={17} aria-hidden="true" /></Link></div>
+        <div className="hero-actions"><a href="#events" className="button">Выбрать хакатон <ArrowDown size={18} aria-hidden="true" /></a><Link to="/challenge" className="text-link accent-link">Пробное задание · до 15 октября <ArrowUpRight size={17} aria-hidden="true" /></Link></div>
         <div className="hero-location"><MapPin size={16} aria-hidden="true" /><span>Санкт-Петербург · Общежитие №2 ГУАП</span></div>
       </div><SeasonPoster />
     </section>
+    <section className="container challenge-spotlight home-challenge" aria-label="Пробное задание Campus ML"><div><span className="eyebrow">УЧАСТВУЕШЬ В CAMPUS ML?</span><h2>Пробное задание — Titanic.</h2><p>Для участия нужно записаться на хакатон и отправить решение <strong>до 15 октября, 23:59 МСК</strong>.</p><p className="small muted">Данные, план работы и форма отправки — на одной странице. Для вайбкодинга задание не требуется.</p></div><Link className="button" to="/challenge">Открыть пробное задание <ArrowUpRight size={18}/></Link></section>
     <div className="benefit-strip"><div className="container"><span><Users size={18} aria-hidden="true" /> Приходи с командой или один</span><span><Coffee size={18} aria-hidden="true" /> Кофе-брейк и новые знакомства</span><span><Mic2 size={18} aria-hidden="true" /> Защита и обратная связь жюри</span></div></div>
     <section className="section container" id="events"><div className="section-heading"><div><span className="eyebrow">01 / КАЛЕНДАРЬ</span><h2>Выбери свой старт.</h2></div><p>Один клуб. Два способа<br />превратить интерес в опыт.</p></div><div className="event-grid">{events.map(event => <EventCard key={event.id} event={event} />)}</div><p className="section-note">Все дедлайны — до 23:59 включительно по московскому времени.</p></section>
     <section className="section container journey"><div><span className="eyebrow">02 / ОТ ЗАЯВКИ ДО ДЕМО</span><h2>Начать проще,<br />чем кажется.</h2><p className="muted">Первый опыт — уже повод прийти.<br />Подготовку можно начать сегодня.</p><Link to="/prepare" className="text-link accent-link">Открыть материалы <ArrowUpRight size={18} aria-hidden="true" /></Link></div>
       <ol className="journey-list">{[
         ['01', 'Выбери направление', 'Campus ML — если интересны данные и модели. Вайбкодинг — если хочешь собрать продукт с помощью ИИ.'],
-        ['02', 'Зарегистрируйся и подготовься', 'Для Campus ML реши пробное задание. Для вайбкодинга проверь инструменты и продумай небольшой проект.'],
+        ['02', 'Войди и запишись на хакатон', 'Для Campus ML реши пробное задание. Для вайбкодинга проверь инструменты и продумай небольшой проект.'],
         ['03', 'Создай и покажи', 'Работай с командой, делай перерывы на кофе и представь результат жюри. Забери опыт и обратную связь.'],
       ].map(([number, title, copy]) => <li key={number}><span className="mono">{number}</span><div><h3>{title}</h3><p>{copy}</p></div><ArrowUpRight size={20} aria-hidden="true" /></li>)}</ol>
     </section>

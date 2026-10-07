@@ -2,46 +2,46 @@ import { createHmac } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse } from 'csv-parse/sync';
 
-export const FEATURE_COLUMNS = ['id', 'day_of_week', 'hour', 'temperature', 'rain', 'is_exam_week', 'nearby_classes', 'menu_type', 'previous_visitors'];
+export const CHALLENGE_ID = 'titanic-v1';
+export const FEATURE_COLUMNS = ['id', 'pclass', 'sex', 'age', 'sibsp', 'parch', 'fare', 'embarked'];
 
 function seededRandom(secret) {
   let counter = 0;
-  return () => createHmac('sha256', secret).update(String(counter++)).digest().readUInt32BE() / 4294967296;
+  return () => createHmac('sha256', secret).update(`${CHALLENGE_ID}:${counter++}`).digest().readUInt32BE() / 4294967296;
 }
-
 export function loadDataset(path, secret) {
-  if (path && existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+  // Keep the previous exercise's dataset intact; use a distinct file for Titanic.
+  const target = path ? `${path.replace(/\.json$/, '')}-${CHALLENGE_ID}.json` : null;
+  if (target && existsSync(target)) {
+    const saved = JSON.parse(readFileSync(target, 'utf8'));
+    if (saved.version !== CHALLENGE_ID || saved.train.length !== 1009 || saved.test.length !== 300) throw new Error('Unexpected Titanic dataset; restore a consistent backup.');
+    return saved;
+  }
   const random = seededRandom(secret);
-  const rows = Array.from({ length: 1500 }, (_, index) => {
-    const day = Math.floor(random() * 7);
-    const hour = 8 + Math.floor(random() * 12);
-    const rain = Number(random() < 0.35);
-    const exam = Number(random() < 0.25);
-    const classes = day < 5 ? Math.floor(random() * 12) : Math.floor(random() * 4);
-    const previous = Math.floor(random() * 65);
-    const menu = ['regular', 'student_combo', 'special'][Math.floor(random() * 3)];
-    const lunch = hour >= 12 && hour <= 14;
-    const logit = -4.5 + Number(lunch) * 2.3 + classes * 0.20 + previous * 0.045
-      + Number(menu === 'student_combo') * 0.8 + rain * 0.35 - exam * 0.45 - Number(day >= 5) * 0.8;
-    return {
-      id: String(10000 + index), day_of_week: day, hour,
-      temperature: Math.round((-5 + random() * 25) * 10) / 10,
-      rain, is_exam_week: exam, nearby_classes: classes, menu_type: menu,
-      previous_visitors: previous, busy: Number(random() < 1 / (1 + Math.exp(-logit))),
-      partitionKey: random(),
-    };
-  });
-  const train = rows.slice(0, 1200);
-  const test = rows.slice(1200).sort((a, b) => a.partitionKey - b.partitionKey)
-    .map((row, index) => ({ ...row, isPublic: index < 200 })).sort((a, b) => Number(a.id) - Number(b.id));
-  const dataset = { version: 1, train, test };
-  if (path) writeFileSync(path, JSON.stringify(dataset), { mode: 0o600, flag: 'wx' });
+  const shuffle = values => {
+    const result = [...values];
+    for (let i=result.length-1;i>0;i--) { const j=Math.floor(random()*(i+1)); [result[i],result[j]]=[result[j],result[i]]; }
+    return result;
+  };
+  const source = parse(readFileSync(new URL('./datasets/titanic.csv', import.meta.url)), { columns:true, skip_empty_lines:true });
+  if(source.length !== 1309) throw new Error('Titanic source must contain 1309 passengers.');
+  const rows = shuffle(source).map((row,index)=>({ ...row, id:String(20000+index), survived:Number(row.survived) }));
+  const train=[], test=[];
+  for(const label of [0,1]) {
+    const group=shuffle(rows.filter(row=>row.survived===label));
+    const testCount=label===1 ? 114 : 186;
+    const publicCount=label===1 ? 76 : 124;
+    test.push(...group.slice(0,testCount).map((row,index)=>({...row,isPublic:index<publicCount})));
+    train.push(...group.slice(testCount));
+  }
+  const dataset={version:CHALLENGE_ID,train:shuffle(train),test:shuffle(test)};
+  if(target) writeFileSync(target,JSON.stringify(dataset),{mode:0o600,flag:'wx'});
   return dataset;
 }
 
 export function datasetCsv(dataset, kind) {
-  if (kind === 'sample_submission') return 'id,busy\n' + dataset.test.map(row => `${row.id},0`).join('\n') + '\n';
-  const columns = kind === 'train' ? [...FEATURE_COLUMNS, 'busy'] : FEATURE_COLUMNS;
+  if (kind === 'sample_submission') return 'id,survived\n' + dataset.test.map(row => `${row.id},0`).join('\n') + '\n';
+  const columns = kind === 'train' ? [...FEATURE_COLUMNS, 'survived'] : FEATURE_COLUMNS;
   return columns.join(',') + '\n' + dataset[kind].map(row => columns.map(column => row[column]).join(',')).join('\n') + '\n';
 }
 
@@ -52,14 +52,14 @@ export function scorePredictions(buffer, dataset) {
   } catch {
     throw new Error('Не удалось прочитать CSV. Используй запятую как разделитель и кодировку UTF-8.');
   }
-  if (records[0]?.join(',') !== 'id,busy') throw new Error('В CSV нужны ровно два столбца: id,busy.');
+  if (records[0]?.join(',') !== 'id,survived') throw new Error('В CSV нужны ровно два столбца: id,survived.');
   const rows = records.slice(1);
   if (rows.length !== dataset.test.length) throw new Error(`Нужно ${dataset.test.length} предсказаний — по одному для каждой строки test.csv.`);
   const predictions = new Map();
   const expectedIds = new Set(dataset.test.map(row => row.id));
   for (const [id, prediction, ...extra] of rows) {
     if (extra.length || !expectedIds.has(id) || predictions.has(id) || !['0', '1'].includes(prediction)) {
-      throw new Error('Проверь ID: без пропусков и повторений, только из test.csv. Значения busy — 0 или 1.');
+      throw new Error('Проверь ID: без пропусков и повторений, только из test.csv. Значения survived — 0 или 1.');
     }
     predictions.set(id, Number(prediction));
   }
@@ -67,9 +67,9 @@ export function scorePredictions(buffer, dataset) {
     let tp = 0, fp = 0, fn = 0;
     for (const row of partition) {
       const prediction = predictions.get(row.id);
-      if (prediction === 1 && row.busy === 1) tp++;
-      if (prediction === 1 && row.busy === 0) fp++;
-      if (prediction === 0 && row.busy === 1) fn++;
+      if (prediction === 1 && row.survived === 1) tp++;
+      if (prediction === 1 && row.survived === 0) fp++;
+      if (prediction === 0 && row.survived === 1) fn++;
     }
     return 2 * tp + fp + fn === 0 ? 0 : 100 * 2 * tp / (2 * tp + fp + fn);
   }
@@ -82,10 +82,10 @@ export function getLeaderboard(db, final) {
   return db.prepare(`
     WITH ranked AS (
       SELECT s.*, ROW_NUMBER() OVER (PARTITION BY registration_id ORDER BY s.public_score DESC, s.created_at ASC, s.id ASC) AS choice
-      FROM submissions s JOIN registrations r ON r.id = s.registration_id WHERE r.status != 'withdrawn'
+      FROM submissions s JOIN registrations r ON r.id = s.registration_id WHERE r.status != 'withdrawn' AND s.challenge_id='${CHALLENGE_ID}'
     )
     SELECT r.display_name AS name, s.${score} AS score, s.created_at AS submittedAt,
-      (SELECT count(*) FROM submissions sub WHERE sub.registration_id = r.id) AS attempts
+      (SELECT count(*) FROM submissions sub WHERE sub.registration_id = r.id AND sub.challenge_id='${CHALLENGE_ID}') AS attempts
     FROM ranked s JOIN registrations r ON r.id = s.registration_id
     WHERE s.choice = 1 ORDER BY s.${score} DESC, s.created_at ASC, s.id ASC
   `).all().map((entry, index) => ({ rank: index + 1, ...entry, score: Math.round(entry.score * 100) / 100 }));

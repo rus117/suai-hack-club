@@ -1,0 +1,36 @@
+@layer components {
+  .auth-layout { display:grid; grid-template-columns:1fr 1fr; gap:72px; align-items:start; }
+  .auth-copy h1 { white-space:pre-line; margin-bottom:24px; }
+  .account-steps { padding-left:22px; margin-block:32px; color:var(--muted); }
+  .account-steps li { padding:8px 0; }
+  .auth-form { min-width:0; }
+  .auth-form h2 { font-size:1.6rem; }
+  .auth-form details p { margin-top:16px; }
+  .account-heading { display:flex; justify-content:space-between; align-items:start; gap:24px; margin-bottom:36px; }
+  .account-heading h1 { font-size:clamp(2rem,4vw,3.5rem); margin-bottom:16px; }
+  .account-heading > div { min-width:0; }
+  .account-events { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:24px; }
+  .account-event { padding:32px; background:var(--surface); border:1px solid var(--line); border-radius:8px; display:grid; gap:20px; align-content:start; }
+  .account-event .eyebrow { margin:0; }
+  .enrollment-status { color:var(--accent); }
+  .challenge-spotlight { display:flex; gap:32px; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--accent); border-left:6px solid var(--accent); padding:32px; border-radius:8px; margin-block:24px 48px; }
+  .challenge-spotlight h2 { font-size:clamp(1.5rem,3vw,2.25rem); margin-bottom:16px; }
+  .challenge-spotlight p + p { margin-top:10px; }
+  .challenge-spotlight .button { flex-shrink:0; }
+  .home-challenge { margin-top:0; }
+  .auth-status { margin-left:auto; display:flex; align-items:center; gap:10px; min-width:0; }
+  .account-chip { min-width:0; display:flex; align-items:center; gap:10px; text-decoration:none; max-width:230px; min-height:44px; }
+  .account-chip span { display:grid; min-width:0; font-size:13px; }
+  .account-chip strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .account-chip small { font-size:10px; color:var(--accent); }
+  .account-chip svg { flex-shrink:0; color:var(--accent); }
+  .desktop-nav { gap:22px; }
+  .nav-task { color:var(--accent) !important; }
+  .task-jump { margin-block:24px; display:flex; gap:20px; flex-wrap:wrap; }
+  .admin-recovery { margin-block:32px; max-width:600px; display:grid; gap:16px; }
+}
+@layer responsive {
+  @media(max-width:1000px) { .desktop-nav { display:none; } .menu-trigger { display:inline-grid; } .account-chip { max-width:170px; } }
+  @media(max-width:800px) { .auth-layout { grid-template-columns:1fr; gap:32px; } .challenge-spotlight { flex-direction:column; align-items:stretch; } .auth-copy h1 { font-size:2.5rem; } .account-events { grid-template-columns:1fr; } }
+  @media(max-width:480px) { .account-chip { max-width:128px; } .account-chip svg { display:none; } .account-heading { flex-direction:column; } .challenge-spotlight,.account-event { padding:22px; } .header-inner { gap:10px; } }
+}

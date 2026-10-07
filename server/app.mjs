@@ -6,8 +6,9 @@ import helmet from 'helmet';
 import multer from 'multer';
 import { z } from 'zod';
 import { openDatabase } from './database.mjs';
+import { accounts, passwordSchema } from './accounts.mjs';
 import { participantAccess } from './participants.mjs';
-import { datasetCsv, getLeaderboard, loadDataset, scorePredictions } from './challenge.mjs';
+import { CHALLENGE_ID, datasetCsv, getLeaderboard, loadDataset, scorePredictions } from './challenge.mjs';
 import { digest, randomToken, rateLimit, requireAdmin, requireCsrf, sessionMiddleware, verifyPassword } from './security.mjs';
 
 const events = JSON.parse(readFileSync(new URL('../shared/events.json', import.meta.url), 'utf8'));
@@ -78,24 +79,17 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
     } catch (error) { db.exec('ROLLBACK'); throw error; }
     res.json({ ok: true });
   });
-  app.post('/api/participant/restore', requireCsrf, limit('recovery', 30), (req, res) => {
-    const token = typeof req.body.token === 'string' ? req.body.token : '';
-    const recovery = db.prepare(`SELECT r.* FROM participant_recovery p JOIN registrations r ON r.id=p.registration_id
-      WHERE p.token_hash=? AND p.expires>? AND r.status!='withdrawn'`).get(digest(token), now().getTime());
-    if (!recovery) return res.status(410).json({ error: 'Ссылка уже использована или истекла. Попроси новую у @Ryctam9.' });
-    db.exec('BEGIN');
-    try {
-      db.prepare('DELETE FROM participant_recovery WHERE registration_id=?').run(recovery.id);
-      db.prepare('DELETE FROM participant_sessions WHERE registration_id=?').run(recovery.id);
-      db.prepare('UPDATE registrations SET token_hash=? WHERE id=?').run(digest(randomToken()), recovery.id);
-      access.grant(res, recovery);
-      db.exec('COMMIT');
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
-    res.json({ eventId: recovery.event_id });
+  const auth = accounts(app, db, { now, production, limit, access });
+  app.post('/api/participant/restore', requireCsrf, limit('recovery', 30), (req,res) => {
+    const password = passwordSchema.safeParse(req.body.password);
+    if (!password.success) return res.status(400).json({ error: password.error.issues[0].message });
+    const result = auth.restore(typeof req.body.token === 'string' ? req.body.token : '', password.data, res);
+    if (!result) return res.status(410).json({ error: 'Ссылка уже использована или истекла. Попроси новую у @Ryctam9.' });
+    res.json(result);
   });
 
-  app.post('/api/registrations', requireCsrf, limit('registration', 60), (req, res) => {
-    const parsed = registrationSchema.safeParse(req.body);
+  app.post('/api/registrations', requireCsrf, auth.requireAccount, limit('registration', 60), (req, res) => {
+    const parsed = registrationSchema.safeParse({ ...req.body, telegram: req.account.telegram });
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message, fields: parsed.error.flatten().fieldErrors });
     const input = parsed.data;
     if (closed(input.eventId)) return res.status(410).json({ error: 'Регистрация на этот хакатон завершена.' });
@@ -106,28 +100,27 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
     const id = randomUUID();
     const legacyPlaceholder = randomToken();
     db.prepare(`INSERT INTO registrations
-      (id,event_id,full_name,telegram,display_name,team_mode,team_name,experience,token_hash,consent_version,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.eventId, input.fullName, input.telegram, input.displayName,
-        input.teamMode, input.teamName, input.experience, digest(legacyPlaceholder), '2026-10-07', now().toISOString());
-    access.grant(res, { id, event_id: input.eventId });
+      (id,event_id,full_name,telegram,display_name,team_mode,team_name,experience,token_hash,consent_version,created_at,account_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.eventId, input.fullName, input.telegram, input.displayName,
+        input.teamMode, input.teamName, input.experience, digest(legacyPlaceholder), '2026-10-07', now().toISOString(), req.account.id);
     res.status(201).json({ id, eventId: input.eventId });
   });
 
-  app.post('/api/submissions', requireCsrf, limit('submission', 150), upload.single('predictions'), (req, res) => {
+  app.post('/api/submissions', requireCsrf, auth.requireAccount, limit('submission', 150), upload.single('predictions'), (req, res) => {
     if (closed('start')) return res.status(410).json({ error: 'Приём пробных заданий завершён 15 октября в 23:59 МСК.' });
-    const registration = access.find(req, 'start');
-    if (!registration) return res.status(403).json({ error: 'В этом браузере нет доступа к заявке Campus ML. Зарегистрируйся или восстанови доступ через @Ryctam9.' });
+    const registration = db.prepare("SELECT * FROM registrations WHERE account_id=? AND event_id='start' AND status!='withdrawn'").get(req.account.id);
+    if (!registration) return res.status(403).json({ error: 'Сначала зарегистрируйся на Campus ML из своего аккаунта.' });
     const report = z.url().max(1000).refine(value => value.startsWith('https://')).safeParse(req.body.reportUrl);
     if (!report.success) return res.status(400).json({ error: 'Добавь HTTPS-ссылку на ноутбук или репозиторий с решением.' });
     if (!req.file) return res.status(400).json({ error: 'Прикрепи CSV с предсказаниями.' });
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now());
-    const count = db.prepare('SELECT count(*) AS total FROM submissions WHERE registration_id=? AND day=?').get(registration.id, day).total;
+    const count = db.prepare('SELECT count(*) AS total FROM submissions WHERE registration_id=? AND day=? AND challenge_id=?').get(registration.id, day, CHALLENGE_ID).total;
     if (count >= 5) return res.status(429).json({ error: 'Сегодня уже было 5 успешных отправок. Следующие попытки доступны после полуночи по Москве.' });
     let scores;
     try { scores = scorePredictions(req.file.buffer, dataset); }
     catch (error) { return res.status(400).json({ error: error.message }); }
-    db.prepare('INSERT INTO submissions VALUES (?,?,?,?,?,?,?,?)').run(randomUUID(), registration.id,
-      scores.publicScore, scores.privateScore, report.data, req.file.originalname.slice(0, 120), now().toISOString(), day);
+    db.prepare('INSERT INTO submissions VALUES (?,?,?,?,?,?,?,?,?)').run(randomUUID(), registration.id,
+      scores.publicScore, scores.privateScore, report.data, req.file.originalname.slice(0, 120), now().toISOString(), day, CHALLENGE_ID);
     res.status(201).json({ score: Math.round(scores.publicScore * 100) / 100, remaining: 4 - count });
   });
 
@@ -147,9 +140,9 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
   const adminRows = () => db.prepare(`SELECT r.id, r.event_id AS eventId, r.full_name AS fullName,
     r.telegram, r.display_name AS displayName, r.team_mode AS teamMode, r.team_name AS teamName,
     r.experience, r.status, r.created_at AS createdAt,
-    (SELECT count(*) FROM submissions WHERE registration_id=r.id) AS submissions,
-    (SELECT max(public_score) FROM submissions WHERE registration_id=r.id) AS publicScore,
-    (SELECT report_url FROM submissions WHERE registration_id=r.id ORDER BY public_score DESC, created_at ASC, id ASC LIMIT 1) AS reportUrl
+    (SELECT count(*) FROM submissions WHERE registration_id=r.id AND challenge_id='${CHALLENGE_ID}') AS submissions,
+    (SELECT max(public_score) FROM submissions WHERE registration_id=r.id AND challenge_id='${CHALLENGE_ID}') AS publicScore,
+    (SELECT report_url FROM submissions WHERE registration_id=r.id AND challenge_id='${CHALLENGE_ID}' ORDER BY public_score DESC, created_at ASC, id ASC LIMIT 1) AS reportUrl
     FROM registrations r ORDER BY r.created_at DESC`).all();
   app.get('/api/admin/registrations', requireAdmin, (_req, res) => res.json({ registrations: adminRows() }));
   app.get('/api/admin/export.csv', requireAdmin, (_req, res) => {

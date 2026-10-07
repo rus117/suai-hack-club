@@ -13,6 +13,18 @@ export function openDatabase(path) {
       id TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL,
       is_admin INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY, telegram TEXT NOT NULL UNIQUE, full_name TEXT NOT NULL,
+      password_hash TEXT NOT NULL, consent_version TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      expires INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS account_recovery (
+      token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+      expires INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS registrations (
       id TEXT PRIMARY KEY, event_id TEXT NOT NULL, full_name TEXT NOT NULL,
       telegram TEXT NOT NULL, display_name TEXT NOT NULL, team_mode TEXT NOT NULL,
@@ -41,5 +53,13 @@ export function openDatabase(path) {
       key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL
     );
   `);
+  if (!db.prepare('PRAGMA table_info(registrations)').all().some(column => column.name === 'account_id')) {
+    db.exec('ALTER TABLE registrations ADD COLUMN account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL');
+  }
+  if (!db.prepare('PRAGMA table_info(submissions)').all().some(column => column.name === 'challenge_id')) {
+    db.exec("ALTER TABLE submissions ADD COLUMN challenge_id TEXT NOT NULL DEFAULT 'cafe-v1'");
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS submissions_challenge ON submissions(challenge_id,registration_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS registrations_account ON registrations(account_id)');
   return db;
 }

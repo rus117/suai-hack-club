@@ -243,8 +243,8 @@
   .material-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 150px 24px; gap: 24px; align-items: center; padding: 32px 0; border-top: 1px solid var(--line); text-decoration: none; }
   .material-row:last-child { border-bottom: 1px solid var(--line); }
   .material-row .eyebrow { font-size: 9px; margin-bottom: 8px; }
-  .material-row h2 { font-size: 24px; letter-spacing: -.025em; }
-  .material-row:hover h2 { color: var(--accent); }
+  .material-row h3 { font-size: 24px; letter-spacing: -.025em; }
+  .material-row:hover h3 { color: var(--accent); }
   .material-row p { margin-top: 8px; font-size: 13px; color: var(--muted); max-width: 620px; }
   .material-time { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
   .preparation-note { display: flex; align-items: center; gap: 40px; margin-top: 48px; }
@@ -397,7 +397,7 @@
     .detail-heading .lead { font-size: 14px; }
     .event-sidebar { position: static; }
     .material-row { grid-template-columns: 24px minmax(0, 1fr) 20px; gap: 16px; padding-block: 24px; }
-    .material-row h2 { font-size: 20px; } .material-row p { font-size: 12px; }
+    .material-row h3 { font-size: 20px; } .material-row p { font-size: 12px; }
     .material-time { grid-column: 2; grid-row: auto; } .material-row > svg { grid-column: 3; grid-row: 1; }
     .preparation-note { flex-direction: column; align-items: flex-start; gap: 24px; }
     .article-layout { margin-top: 32px; }

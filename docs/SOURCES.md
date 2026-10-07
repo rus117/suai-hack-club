@@ -22,3 +22,21 @@
 - [scikit-learn — типичные ошибки и утечка данных](https://scikit-learn.org/stable/common_pitfalls.html)
 - [MDN — веб-разработка](https://developer.mozilla.org/en-US/docs/Learn_web_development)
 - [GitHub — Hello World](https://docs.github.com/en/get-started/using-github/hello-world)
+
+
+## Расширенная учебная мастерская (7 октября 2026)
+
+Собственные объяснения и упражнения клуба связывают документацию с двумя сквозными работами: синтетическим ML-заданием «Час пик» и приложением встреч. Полные сторонние курсы не копируются и не встраиваются в iframe. На сайте у каждой ссылки указаны язык, формат и конкретное действие после чтения. Длительность учитывает практику; это оценка автора маршрута, не обещание провайдеров.
+
+Дополнительно изучены и включены:
+
+- [Inria scikit-learn MOOC](https://inria.github.io/scikit-learn-mooc/) — pipeline, переобучение, подбор, деревья и ансамбли.
+- [Google ML Crash Course](https://developers.google.com/machine-learning/crash-course) и [упражнения](https://developers.google.com/machine-learning/crash-course/exercises).
+- [Яндекс: кросс-валидация](https://education.yandex.ru/handbook/ml/article/kross-validaciya), [основы Python](https://education.yandex.ru/handbook/python).
+- [scikit-learn: CV](https://scikit-learn.org/stable/modules/cross_validation.html), [Pipeline](https://scikit-learn.org/stable/modules/compose.html), [подбор](https://scikit-learn.org/stable/modules/grid_search.html), [порог](https://scikit-learn.org/stable/modules/classification_threshold.html), [permutation importance](https://scikit-learn.org/stable/inspection/permutation_importance.html).
+- [MDN: клиент и сервер](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/First_steps/Client-Server_overview), [формы](https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Structuring_content/HTML_forms), [отладка](https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Debugging_JavaScript).
+- [React: Thinking in React](https://react.dev/learn/thinking-in-react).
+- [Claude Code: Best practices](https://code.claude.com/docs/en/best-practices), [GitHub Copilot: постановка задач](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent-to-work-on-tasks/best-practices-for-using-copilot-to-work-on-tasks).
+- [Playwright: Best practices](https://playwright.dev/docs/best-practices), [W3C WAI: Easy Checks](https://www.w3.org/WAI/test-evaluate/easy-checks/).
+
+Тексты уроков находятся в `src/learning/`, порядок маршрутов — в `src/materials.ts`, материалы для скачивания — в `public/learning/`. При обновлении содержания проверяйте ссылки, суммы часов и согласованность схемы development/holdout. Учебный notebook публикуется с пустыми выводами и не содержит закрытых ответов.

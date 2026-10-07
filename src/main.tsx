@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import '@fontsource-variable/manrope';
 import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
+import './learning.css';
 import { Layout } from './components/Layout';
 import { Home } from './Home';
 import { EventPage } from './EventPage';

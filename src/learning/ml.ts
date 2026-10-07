@@ -170,7 +170,7 @@ export const mlMaterials: Material[] = [
       ], source: { title: 'scikit-learn: permutation importance', url: 'https://scikit-learn.org/stable/inspection/permutation_importance.html' } },
       { title: 'Финальный файл — часть решения', paragraphs: [
         'Зафиксировав все решения, переобучи тот же pipeline на полном train.csv. Применяй к test.csv те же признаки в том же порядке. Сохрани исходные ID; не превращай индекс DataFrame в дополнительный столбец. Ожидается 300 строк, столбцы id,busy и метки только 0/1.',
-        'Проверь файл повторным чтением, соответствие ID и отсутствие пропусков. Открой ссылку на ноутбук в приватном окне: организатору должен быть доступен код, графики и выводы. Личный код участника не добавляй ни в ноутбук, ни в README.',
+        'Проверь файл повторным чтением, соответствие ID и отсутствие пропусков. Открой ссылку на ноутбук в приватном окне: организатору должен быть доступен код, графики и выводы. Личную ссылку для входа не добавляй ни в ноутбук, ни в README.',
         'В итогах раздели измеренное, предполагаемое и ещё не проверенное. Укажи роль ИИ: какие части помог написать, какие ошибки ты исправил и как проверил результат. Синтетическая задача — тренировка процесса, а не доказательство готовности модели к эксплуатации.'
       ], code: 'submission = pd.read_csv("submission.csv")\ntest_data = pd.read_csv("test.csv")\nassert list(submission.columns) == ["id", "busy"]\nassert len(submission) == len(test_data) == 300\nassert submission["id"].is_unique\nassert set(submission["id"]) == set(test_data["id"])\nassert submission["busy"].notna().all()\nassert submission["busy"].isin([0, 1]).all()' }
     ],

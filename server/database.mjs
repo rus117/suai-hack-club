@@ -21,6 +21,15 @@ export function openDatabase(path) {
       created_at TEXT NOT NULL, UNIQUE(event_id, telegram),
       UNIQUE(event_id, display_name)
     );
+    CREATE TABLE IF NOT EXISTS participant_sessions (
+      token_hash TEXT PRIMARY KEY, registration_id TEXT NOT NULL REFERENCES registrations(id) ON DELETE CASCADE,
+      expires INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS participant_sessions_registration ON participant_sessions(registration_id);
+    CREATE TABLE IF NOT EXISTS participant_recovery (
+      token_hash TEXT PRIMARY KEY, registration_id TEXT NOT NULL UNIQUE REFERENCES registrations(id) ON DELETE CASCADE,
+      expires INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS submissions (
       id TEXT PRIMARY KEY, registration_id TEXT NOT NULL REFERENCES registrations(id),
       public_score REAL NOT NULL, private_score REAL NOT NULL,

@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import multer from 'multer';
 import { z } from 'zod';
 import { openDatabase } from './database.mjs';
+import { participantAccess } from './participants.mjs';
 import { datasetCsv, getLeaderboard, loadDataset, scorePredictions } from './challenge.mjs';
 import { digest, randomToken, rateLimit, requireAdmin, requireCsrf, sessionMiddleware, verifyPassword } from './security.mjs';
 
@@ -27,6 +28,7 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
   if (!datasetSecret || datasetSecret.length < 24) throw new Error('DATASET_SECRET must contain at least 24 characters. Run npm run setup.');
   const app = express();
   const db = openDatabase(dbPath);
+  const access = participantAccess(db, { now, production });
   const dataset = loadDataset(datasetPath, datasetSecret);
   const limit = (scope, max, windowMs = 60 * 60 * 1000) => rateLimit(db, { scope, max, windowMs, now });
   const closed = id => now().getTime() >= new Date(events.find(event => event.id === id).deadline).getTime();
@@ -58,29 +60,63 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
   app.use('/api', sessionMiddleware(db, { secure: production, now }));
   app.get('/api/session', (req, res) => res.json({ csrf: req.session.csrf, admin: Boolean(req.session.is_admin) }));
 
+  app.get('/api/participant', (req, res) => {
+    const participants = events.map(event => access.find(req, event.id)).filter(Boolean)
+      .map(row => ({ eventId: row.event_id, displayName: row.display_name }));
+    res.json({ participants });
+  });
+  app.post('/api/participant/migrate', requireCsrf, limit('migration', 30), (req, res) => {
+    const token = typeof req.body.token === 'string' ? req.body.token : '';
+    const row = db.prepare("SELECT * FROM registrations WHERE token_hash=? AND event_id=? AND status!='withdrawn'")
+      .get(digest(token), String(req.body.eventId || ''));
+    if (!row) return res.status(403).json({ error: 'Для восстановления доступа напиши @Ryctam9.' });
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE registrations SET token_hash=? WHERE id=?').run(digest(randomToken()), row.id);
+      access.grant(res, row);
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    res.json({ ok: true });
+  });
+  app.post('/api/participant/restore', requireCsrf, limit('recovery', 30), (req, res) => {
+    const token = typeof req.body.token === 'string' ? req.body.token : '';
+    const recovery = db.prepare(`SELECT r.* FROM participant_recovery p JOIN registrations r ON r.id=p.registration_id
+      WHERE p.token_hash=? AND p.expires>? AND r.status!='withdrawn'`).get(digest(token), now().getTime());
+    if (!recovery) return res.status(410).json({ error: 'Ссылка уже использована или истекла. Попроси новую у @Ryctam9.' });
+    db.exec('BEGIN');
+    try {
+      db.prepare('DELETE FROM participant_recovery WHERE registration_id=?').run(recovery.id);
+      db.prepare('DELETE FROM participant_sessions WHERE registration_id=?').run(recovery.id);
+      db.prepare('UPDATE registrations SET token_hash=? WHERE id=?').run(digest(randomToken()), recovery.id);
+      access.grant(res, recovery);
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    res.json({ eventId: recovery.event_id });
+  });
+
   app.post('/api/registrations', requireCsrf, limit('registration', 60), (req, res) => {
     const parsed = registrationSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message, fields: parsed.error.flatten().fieldErrors });
     const input = parsed.data;
     if (closed(input.eventId)) return res.status(410).json({ error: 'Регистрация на этот хакатон завершена.' });
     const existing = db.prepare('SELECT id FROM registrations WHERE event_id=? AND telegram=?').get(input.eventId, input.telegram);
-    if (existing) return res.status(409).json({ error: 'Заявка с этим Telegram уже есть. Для восстановления кода напиши @Ryctam9.' });
+    if (existing) return res.status(409).json({ error: 'Заявка с этим Telegram уже есть. Для восстановления доступа напиши @Ryctam9.' });
     const nameTaken = db.prepare('SELECT id FROM registrations WHERE event_id=? AND lower(display_name)=lower(?)').get(input.eventId, input.displayName);
     if (nameTaken) return res.status(409).json({ error: 'Этот ник уже занят на выбранном хакатоне. Придумай другой.' });
     const id = randomUUID();
-    const receiptCode = randomToken();
+    const legacyPlaceholder = randomToken();
     db.prepare(`INSERT INTO registrations
       (id,event_id,full_name,telegram,display_name,team_mode,team_name,experience,token_hash,consent_version,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(id, input.eventId, input.fullName, input.telegram, input.displayName,
-        input.teamMode, input.teamName, input.experience, digest(receiptCode), '2026-10-07', now().toISOString());
-    res.status(201).json({ id, receiptCode, eventId: input.eventId });
+        input.teamMode, input.teamName, input.experience, digest(legacyPlaceholder), '2026-10-07', now().toISOString());
+    access.grant(res, { id, event_id: input.eventId });
+    res.status(201).json({ id, eventId: input.eventId });
   });
 
   app.post('/api/submissions', requireCsrf, limit('submission', 150), upload.single('predictions'), (req, res) => {
     if (closed('start')) return res.status(410).json({ error: 'Приём пробных заданий завершён 15 октября в 23:59 МСК.' });
-    const receipt = typeof req.body.receiptCode === 'string' ? req.body.receiptCode.trim() : '';
-    const registration = db.prepare("SELECT * FROM registrations WHERE token_hash=? AND event_id='start' AND status != 'withdrawn'").get(digest(receipt));
-    if (!registration) return res.status(403).json({ error: 'Код участника не найден. Используй код из подтверждения регистрации на Campus ML.' });
+    const registration = access.find(req, 'start');
+    if (!registration) return res.status(403).json({ error: 'В этом браузере нет доступа к заявке Campus ML. Зарегистрируйся или восстанови доступ через @Ryctam9.' });
     const report = z.url().max(1000).refine(value => value.startsWith('https://')).safeParse(req.body.reportUrl);
     if (!report.success) return res.status(400).json({ error: 'Добавь HTTPS-ссылку на ноутбук или репозиторий с решением.' });
     if (!req.file) return res.status(400).json({ error: 'Прикрепи CSV с предсказаниями.' });
@@ -129,11 +165,14 @@ export function createApp({ dbPath = 'data/club.sqlite', datasetPath = 'data/dat
     if (!updated.changes) return res.status(404).json({ error: 'Заявка не найдена.' });
     res.json({ ok: true });
   });
-  app.post('/api/admin/registrations/:id/reset-code', requireAdmin, requireCsrf, (req, res) => {
-    const receiptCode = randomToken();
-    const updated = db.prepare('UPDATE registrations SET token_hash=? WHERE id=?').run(digest(receiptCode), req.params.id);
-    if (!updated.changes) return res.status(404).json({ error: 'Заявка не найдена.' });
-    res.json({ receiptCode });
+  app.post('/api/admin/registrations/:id/recovery-link', requireAdmin, requireCsrf, (req, res) => {
+    const registration = db.prepare("SELECT * FROM registrations WHERE id=? AND status!='withdrawn'").get(req.params.id);
+    if (!registration) return res.status(404).json({ error: 'Активная заявка не найдена.' });
+    const token = randomToken();
+    const expires = now().getTime() + 60 * 60 * 1000;
+    db.prepare('DELETE FROM participant_recovery WHERE expires<=?').run(now().getTime());
+    db.prepare('INSERT OR REPLACE INTO participant_recovery VALUES (?,?,?)').run(digest(token), registration.id, expires);
+    res.json({ path: `/restore#token=${token}`, expiresAt: new Date(expires).toISOString() });
   });
   app.delete('/api/admin/registrations/:id', requireAdmin, requireCsrf, (req, res) => {
     if (!db.prepare('SELECT id FROM registrations WHERE id=?').get(req.params.id)) return res.status(404).json({ error: 'Заявка не найдена.' });

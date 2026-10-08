@@ -64,7 +64,7 @@ async function refresh() {
   $("#account-link").textContent = me.admin
     ? "Админка"
     : me.user
-      ? "Мой дневник"
+      ? "Мой профиль"
       : "Войти";
 }
 function icon(name) {
@@ -98,19 +98,12 @@ function card(e, heading = 3) {
 let calendarState = null,
   calendarContext = "",
   calendarTabsStart = "";
-function getCalendar(archive) {
-  const context = archive ? "past" : "future";
-  if (calendarContext !== context || !calendarState) {
-    const current = DormCalendar.dayKey().slice(0, 7);
-    const latestPast = past()[0];
-    const initial =
-      archive && latestPast
-        ? DormCalendar.dayKey(latestPast.date).slice(0, 7)
-        : current;
-    calendarState = DormCalendar.selectMonth(initial, archive);
-    calendarTabsStart = initial;
-    calendarContext = context;
-  }
+function getCalendar() {
+  if (!calendarState)
+    calendarState = DormCalendar.selectMonth(
+      DormCalendar.dayKey().slice(0, 7),
+      false,
+    );
   return calendarState;
 }
 function calendarLabel(month, grammatical = false) {
@@ -134,45 +127,33 @@ function rangeLabel(s) {
   return `${from === to ? from : `${from}–${to}`} ${calendarLabel(s.month, true)}`;
 }
 function afisha(archive = false, level = 1) {
-  const s = getCalendar(archive);
+  const s = getCalendar();
+  const currentMonth = DormCalendar.dayKey().slice(0, 7);
   const arr = data.events
-    .filter((e) => DormCalendar.matches(e, s, archive, filter))
-    .sort((a, b) =>
-      archive
-        ? new Date(b.date) - new Date(a.date)
-        : new Date(a.date) - new Date(b.date),
-    );
+    .filter((e) => DormCalendar.matches(e, s, false, filter))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
   const today = DormCalendar.dayKey();
   const days = DormCalendar.monthDays(s.month).filter(
-    (day) => archive || s.month !== today.slice(0, 7) || day >= today,
+    (day) => s.month !== currentMonth || day >= today,
   );
   const eventDays = new Set(
     data.events
       .filter(
         (e) =>
-          (archive
-            ? new Date(e.date) <= new Date()
-            : new Date(e.date) > new Date()) &&
+          new Date(e.date) > new Date() &&
           (filter === "Все" || e.category === filter),
       )
       .map((e) => DormCalendar.dayKey(e.date)),
   );
-  const tabs = [0, 1, 2].map((n) =>
-    DormCalendar.shiftMonth(calendarTabsStart, n),
-  );
-  const year = s.month.slice(0, 4);
-  return `<div class="afisha" data-archive="${archive}">
-    <div class="afisha-heading"><h${level}>Афиша ${rangeLabel(s)}</h${level}><span class="calendar-year">${year}</span></div>
-    <div class="calendar-toolbar">
-      <div class="month-tabs" aria-label="Месяц">${tabs.map((m) => `<button class="month-tab ${m === s.month ? "active" : ""}" data-month="${m}" aria-pressed="${m === s.month}">${esc(calendarLabel(m))}</button>`).join("")}</div>
-      <div class="status-tabs" aria-label="Период мероприятий"><a class="${archive ? "" : "active"}" href="/events" ${archive ? "" : 'aria-current="page"'}>Предстоящие</a><a class="${archive ? "active" : ""}" href="/archive" ${archive ? 'aria-current="page"' : ""}>Прошедшие</a></div>
-    </div>
+  return `<div class="afisha">
+    <div class="afisha-heading"><h${level}>Мероприятия</h${level}></div>
+    <div class="calendar-toolbar"><span class="calendar-month">${esc(calendarLabel(s.month))} ${s.month.slice(0, 4)}</span></div>
     <div class="calendar-strip">
-      <button class="calendar-nav" data-month-shift="-1" aria-label="Предыдущий месяц">${icon("chevron-left")}</button>
+      <button class="calendar-nav" data-month-shift="-1" aria-label="Предыдущий месяц" ${s.month <= currentMonth ? "disabled" : ""}>${icon("chevron-left")}</button>
       <div class="calendar-days" role="group" aria-label="Выберите день или диапазон дат">${days
         .map((day) => {
-          const boundary = day === s.from || day === s.to;
-          const inside = day >= s.from && day <= s.to;
+          const boundary = day === s.from || day === s.to,
+            inside = day >= s.from && day <= s.to;
           const weekday = new Date(`${day}T12:00:00Z`).toLocaleDateString(
             "ru-RU",
             { weekday: "short", timeZone: "UTC" },
@@ -186,9 +167,9 @@ function afisha(archive = false, level = 1) {
         .join("")}</div>
       <button class="calendar-nav" data-month-shift="1" aria-label="Следующий месяц">${icon("chevron-right")}</button>
     </div>
-    <div class="calendar-caption"><span id="calendar-help">${s.awaitingEnd ? "День выбран. Нажми на второй день, чтобы задать конец периода." : "Нажми на день, затем на конец периода. Точки отмечают события."}</span><button class="calendar-reset" data-month-reset>Весь месяц</button></div>
-    <div class="afisha-filters"><div class="filters" aria-label="Категория">${["Все", "Вместе", "Технологии", "Спорт", "Творчество"].map((cat) => `<button class="chip ${filter === cat ? "active" : ""}" data-filter="${cat}" aria-pressed="${filter === cat}">${cat}</button>`).join("")}</div><span class="result-count" role="status" aria-live="polite">Найдено: ${arr.length}</span></div>
-    <div class="events-grid">${arr.map((e) => card(e, level + 1)).join("") || '<div class="empty"><h3>На эти даты ничего не запланировано</h3><p>Выбери другой период или посмотри весь месяц.</p><button class="button light" data-month-reset>Весь месяц</button></div>'}</div>
+    <div class="calendar-caption"><span id="calendar-help">${s.awaitingEnd ? "Нажми на второй день, чтобы выбрать конец периода." : "Выбери день или диапазон. Точки отмечают события."}</span><button class="calendar-reset" data-month-reset>Сбросить период</button></div>
+    <div class="afisha-filters"><label class="category-select" for="event-category"><span>Категория</span><select id="event-category">${["Все", "Вместе", "Технологии", "Спорт", "Творчество"].map((cat) => `<option value="${cat}" ${filter === cat ? "selected" : ""}>${cat === "Все" ? "Все категории" : cat}</option>`).join("")}</select></label><span class="result-count" role="status" aria-live="polite">Найдено: ${arr.length}</span></div>
+    <div class="events-grid">${arr.map((e) => card(e, level + 1)).join("") || '<div class="empty"><h3>В этот период событий нет</h3><p>Выбери другие даты или категорию.</p><button class="button light" data-month-reset>Сбросить период</button></div>'}</div>
   </div>`;
 }
 const badges = [
@@ -240,11 +221,7 @@ function unlocked(b) {
   return b.goal
     ? attended.length >= b.goal
     : b.category
-      ? attended.some(
-          (r) =>
-            data.events.find((e) => e.id === r.eventId)?.category ===
-            b.category,
-        )
+      ? attended.some((r) => findEvent(r.eventId)?.category === b.category)
       : !!me.user?.actions?.[b.action];
 }
 function badge(b, mini = false) {
@@ -252,46 +229,40 @@ function badge(b, mini = false) {
   return `<div class="achievement-card ${!mini && !yes ? "locked" : ""}"><small class="badge-status">${mini ? "КАРТА СОСЕДА" : yes ? "В коллекции" : "Ещё впереди"}</small><span class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="/assets/cards.svg#${b.id}"></use></svg></span><h3>${esc(b.title)}</h3>${mini ? "" : `<p>${esc(b.text)}</p>`}</div>`;
 }
 function home() {
-  const b = data.articles;
-  return `<section class="hero"><div>
-    <div class="eyebrow">ГУАП · Общежитие №2</div>
-    <h1>Афиша нашего<br>общежития</h1>
-    <p>Хакатоны, спорт, кино и встречи с соседями на Передовиков, 13. Выбирай событие и записывайся.</p>
-    <div class="buttons"><a class="button" href="/events">Смотреть афишу</a><a class="text-link" href="/blog">Дневник общежития</a></div>
-  </div><div class="hero-art"><div class="pin"></div><figure><img src="/assets/dormitory.webp" alt="Рисунок общежития №2 ГУАП"><figcaption><span>Передовиков, 13</span><span>Санкт-Петербург</span></figcaption></figure><a class="tiny-roof" href="/roof/quiet-hour" aria-label="Осмотреть маленькое окно на крыше">☽</a></div></section>
-  <section class="section-pad home-afisha">${afisha(false, 2)}<p class="schedule-note">Время и места предварительные. Подробности уточняются в карточках.</p></section>
-  <section class="collection-band"><div><h2>Ачивки за участие</h2><p>Приходи на мероприятия и собирай карточки. Организатор отметит посещение, и достижение появится в твоём профиле.</p><a class="text-link" href="/achievements">Посмотреть коллекцию</a></div><div class="mini-cards">${badges
+  return `<div class="hero-landing"><div class="hero-illustration" role="img" aria-label="Рисунок общежития №2 ГУАП на Передовиков, 13"></div>
+    <section class="hero-layout"><div aria-hidden="true"></div><div class="hero-copy"><div class="eyebrow">ГУАП · Общежитие №2</div><h1>Что происходит<br>в нашем общежитии</h1><p>Хакатоны, спорт, кино и встречи с соседями на Передовиков, 13. Выбирай мероприятие и присоединяйся.</p><div class="buttons"><a class="button" href="/events">Мероприятия</a><a class="text-link" href="/blog">Дневник общежития</a></div></div></section>
+    <a class="hero-secret" href="/roof/quiet-hour" aria-label="Осмотреть маленькое окно над общежитием" title="Кажется, там кто-то есть">☽</a>
+  </div>
+  <div class="home-zone zone-events"><section>${afisha(false, 2)}<p class="schedule-note">Время и места предварительные. Подробности уточняются в карточках.</p></section></div>
+  <div class="home-zone zone-collection"><section class="collection-band"><div><h2>Ачивки за участие</h2><p>Приходи на мероприятия и собирай карточки. Организатор отметит посещение, и достижение появится в твоём профиле.</p><a class="text-link" href="/achievements">Посмотреть коллекцию</a></div><div class="mini-cards">${badges
     .slice(0, 3)
     .map((x) => badge(x, true))
-    .join("")}</div></section>
-  <section class="section-pad"><div class="section-head"><h2>Дневник общежития</h2><a class="text-link" href="/blog">Все записи</a></div><div class="blog-grid">
-    ${b[0] ? `<a class="blog-main" href="/blog/${esc(b[0].id)}"><img src="${esc(b[0].image)}" alt="" loading="lazy"><div><span class="tag">${esc(b[0].category)}</span><h3>${esc(b[0].title)}</h3><p>${esc(b[0].intro)}</p><span class="text-link">Читать</span></div></a>` : ""}
-    <div class="blog-side">${b
-      .slice(1, 3)
-      .map(
-        (x) =>
-          `<article><a href="/blog/${esc(x.id)}"><span class="tag">${esc(x.category)}</span><h3>${esc(x.title)}</h3><p>${esc(x.intro)}</p><span class="text-link">Читать</span></a></article>`,
-      )
-      .join("")}</div>
-  </div></section>`;
+    .join("")}</div></section></div>
+<div class="student-corner" role="img" aria-label="Студенческий уголок: конспекты, ноутбук, кружка и лампа"></div>`;
 }
-function events(archive = false) {
-  return `<div class="page events-page">${afisha(archive)}<p class="schedule-note">${archive ? "Архив прошедших встреч. Сентябрьская запись служит примером." : "Время и площадки предварительные. Настолки и киновечер пока служат примерами."}</p></div>`;
+function events() {
+  return `<div class="page events-page">${afisha(false)}<p class="schedule-note">Время и площадки предварительные. Настолки и киновечер пока служат примерами.</p></div>`;
 }
 function eventDetail(id) {
-  const e = data.events.find((x) => x.id === id);
+  const e = findEvent(id);
   if (!e) return missing();
   const closed = new Date(e.date) <= new Date(),
     registered = (me.registrations || []).some((x) => x.eventId === id);
-  return `<div class="page"><div class="breadcrumb"><a href="/events">Афиша</a> / ${esc(e.category)}</div><div class="detail"><img src="${esc(e.image)}" alt="${esc(e.title)}"><div><div class="eyebrow">${esc(e.category)} · ${closed ? "В АРХИВЕ" : "ПРЕДСТОЯЩЕЕ СОБЫТИЕ"}</div><h1>${esc(e.title)}</h1><p class="lede">${esc(e.intro)}</p><div class="fact-row"><span>Когда</span><strong>${fmt(e.date, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} МСК</strong></div><div class="fact-row"><span>Где</span><span>${esc(e.place)}</span></div><div class="fact-row"><span>Кто собирает</span><span>Инициативные люди</span></div><div class="buttons">${closed ? '<span class="helper">Встреча завершена, запись закрыта.</span>' : `<button class="button" data-register="${esc(id)}" data-cancel="${registered}">${registered ? "Отменить запись" : "Приду"} <span>${registered ? "×" : ""}</span></button>${registered ? '<span class="helper">Ты в списке. До встречи!</span>' : '<span class="helper">Запись в один клик.</span>'}`}</div></div></div><div class="article-body">${paras(e.body)}</div></div>`;
+  return `<div class="page"><div class="breadcrumb"><a href="/events">Мероприятия</a> / ${esc(e.category)}</div><div class="detail"><img src="${esc(e.image)}" alt="${esc(e.title)}"><div><div class="eyebrow">${esc(e.category)} · ${closed ? "В АРХИВЕ" : "ПРЕДСТОЯЩЕЕ СОБЫТИЕ"}</div><h1>${esc(e.title)}</h1><p class="lede">${esc(e.intro)}</p><div class="fact-row"><span>Когда</span><strong>${fmt(e.date, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} МСК</strong></div><div class="fact-row"><span>Где</span><span>${esc(e.place)}</span></div><div class="fact-row"><span>Кто собирает</span><span>Инициативные люди</span></div><div class="buttons">${closed ? '<span class="helper">Встреча завершена, запись закрыта.</span>' : `<button class="button" data-register="${esc(id)}" data-cancel="${registered}">${registered ? "Отменить запись" : "Приду"} <span>${registered ? "×" : ""}</span></button>${registered ? '<span class="helper">Ты в списке. До встречи!</span>' : '<span class="helper">Запись в один клик.</span>'}`}</div></div></div><div class="article-body">${paras(e.body)}</div></div>`;
 }
 function blog(id) {
   if (id) {
     const b = data.articles.find((x) => x.id === id);
     if (!b) return missing();
-    return `<div class="page"><div class="breadcrumb"><a href="/blog">Дневник</a> / ${esc(b.category)}</div><div class="article-hero"><div class="tag">${esc(b.category)} · Инициативные люди</div><h1>${esc(b.title)}</h1><p class="page-intro centered">${esc(b.intro)}</p><img src="${esc(b.image)}" alt="Иллюстрация к истории ${esc(b.title)}"></div><div class="article-body">${paras(b.body)}<button class="button light" data-read>Прочитал</button><p class="helper">Оставит маленькую ачивку в твоей коллекции.</p></div></div>`;
+    const index = data.articles.findIndex((x) => x.id === id),
+      next = data.articles[index + 1];
+    return `<div class="diary-page diary-reading"><div class="page"><div class="breadcrumb"><a href="/blog">К разложенным страницам</a></div>
+      <article class="diary-full paper-surface"><div class="paper-heading"><span>${esc(b.category)}</span><span>Лист ${String(index + 1).padStart(2, "0")}</span></div><h1>${esc(b.title)}</h1><p class="diary-lede">${esc(b.intro)}</p><figure class="diary-photo"><img src="${esc(b.image)}" alt="Иллюстрация к записи ${esc(b.title)}"></figure><div class="diary-full-text">${paras(b.body)}</div><div class="diary-end"><button class="button light" data-read>Прочитал</button>${next ? `<a class="text-link" href="/blog/${esc(next.id)}">Следующая страница</a>` : '<a class="text-link" href="/blog">Все страницы</a>'}</div></article>
+    </div></div>`;
   }
-  return `<div class="page"><h1>Дневник общежития</h1><p class="page-intro">Заметки о жизни в общежитии, подготовке к мероприятиям и идеях соседей.</p><div class="events-grid">${data.articles.map((b) => `<article class="event-card"><a href="/blog/${esc(b.id)}"><div class="card-picture"><img src="${esc(b.image)}" alt="${esc(b.title)}" loading="lazy"></div><div class="card-meta">${esc(b.category)}</div><h3>${esc(b.title)}</h3><p>${esc(b.intro)}</p><span class="text-link">Читать</span></a></article>`).join("")}</div></div>`;
+  return `<div class="diary-page"><div class="page"><div class="diary-introduction"><h1>Дневник общежития</h1><p>Заметки, идеи и небольшие истории. Нажми на лист, чтобы прочитать запись целиком.</p></div>
+    <div class="diary-scatter">${data.articles.map((b, index) => `<article class="diary-sheet paper-surface sheet-${index % 3}"><div class="paper-heading"><span>${esc(b.category)}</span><span>${String(index + 1).padStart(2, "0")}</span></div><h2><a class="sheet-link" href="/blog/${esc(b.id)}">${esc(b.title)}</a></h2>${index % 3 === 0 ? `<figure class="diary-photo"><img src="${esc(b.image)}" alt="" loading="lazy"></figure>` : ""}<p>${esc(b.intro)}</p>${index % 3 === 2 ? '<div class="paper-doodle" aria-hidden="true">ноутбук ✓<br>зарядка ✓<br>начать с малого</div>' : ""}<span class="paper-open">Развернуть запись</span></article>`).join("")}</div>
+  </div></div>`;
 }
 function login() {
   const err = new URLSearchParams(location.search).get("error");
@@ -300,24 +271,51 @@ function login() {
 function achievements() {
   return `<div class="page"><h1>Коллекция достижений</h1><p class="page-intro">Карточки открываются за посещение мероприятий. Организатор подтверждает участие в админке; результат появляется в твоём профиле.</p><div class="achievement-grid">${badges.map((b) => badge(b)).join("")}</div><div class="note">За реальные посещения — четыре карточки. Ещё две прячутся в дневнике и в одном тихом месте сайта. ${me.user ? "Твои открытые карты уже отмечены." : '<a class="text-link" href="/login">Войди, чтобы начать коллекцию</a>'}</div></div>`;
 }
+function avatarURL(u) {
+  return u.avatar
+    ? `/api/profile/photo?user=${encodeURIComponent(u.id)}&v=${encodeURIComponent(u.avatar)}`
+    : "";
+}
+function findEvent(id) {
+  return (
+    data.events.find((e) => e.id === id) ||
+    (me.history || []).find((e) => e.id === id)
+  );
+}
 function profile() {
   if (!me.user) return login();
-  const regs = me.registrations || [],
-    att = regs.filter((r) => r.attended).length;
-  return `<div class="page"><div class="profile-top"><div><div class="eyebrow">МОЙ ДНЕВНИК</div><h1>Привет, ${esc(me.user.name)}.</h1><span class="helper">${esc(me.user.provider === "demo" ? "Демонстрационный профиль" : me.user.provider)} · сосед с ${fmt(me.user.joined, { day: "numeric", month: "long" })}</span></div><button class="button light" data-logout>Выйти</button></div><div class="stats"><div><strong>${regs.length}</strong><span>записей на встречи</span></div><div><strong>${att}</strong><span>реальных посещений</span></div><div><strong>${badges.filter(unlocked).length} / 6</strong><span>карт в коллекции</span></div></div><div class="section-head"><h2>Мои планы</h2><a class="text-link" href="/events">Найти встречу</a></div><div class="events-grid">${
-    regs
-      .map((r) => data.events.find((e) => e.id === r.eventId))
-      .filter(Boolean)
-      .map((e) => card(e))
-      .join("") ||
-    '<div class="empty">Пока чистая страница. Выбери встречу в афише — и нажми «Приду».</div>'
-  }</div><h2 class="spaced-heading">Мои достижения</h2><div class="achievement-grid">${badges.map((b) => badge(b)).join("")}</div></div>`;
+  const u = me.user,
+    regs = me.registrations || [];
+  const plans = regs
+    .map((r) => data.events.find((e) => e.id === r.eventId))
+    .filter((e) => e && new Date(e.date) > new Date())
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  const history = (me.history || [])
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const full = u.name.split(" "),
+    first = u.firstName || full[0],
+    last = u.lastName || (!u.profileUpdated ? full.slice(1).join(" ") : "");
+  return `<div class="page profile-page"><div class="profile-top"><div><h1>Личный кабинет</h1><p class="helper">Твои данные, записи на мероприятия и подтверждённые посещения.</p></div><button class="button light" data-logout>Выйти</button></div>
+    <div class="profile-layout"><aside class="profile-summary panel"><div class="profile-avatar">${u.avatar ? `<img src="${avatarURL(u)}" alt="Фото ${esc(u.name)}">` : `<span>${esc(first.slice(0, 1))}</span>`}</div><h2>${esc(u.name)}</h2><p>${esc(u.provider === "demo" ? "Демопрофиль" : u.provider === "vk" ? "Аккаунт VK" : "Аккаунт Telegram")}</p><label class="photo-picker" for="profile-photo">Загрузить фото<input id="profile-photo" type="file" accept="image/jpeg,image/png"></label><p class="helper">PNG или JPEG до 3 МБ.<br>Фото обрезается по центру.</p><div class="profile-metrics"><div><strong>${plans.length}</strong><span>предстоящих встреч</span></div><div><strong>${regs.filter((r) => r.attended).length}</strong><span>подтверждённых посещений</span></div></div></aside>
+    <section class="profile-information panel"><h2>Информация о себе</h2><p class="helper">Поля можно заполнить позже. Для записи на мероприятие они не нужны.</p><form id="profile-form" class="profile-form">
+      <label>Имя<input name="firstName" value="${esc(first)}" maxlength="80" autocomplete="given-name" required></label><label>Фамилия<input name="lastName" value="${esc(last)}" maxlength="80" autocomplete="family-name"></label>
+      <label class="wide">Почта<input name="email" type="email" value="${esc(u.email || "")}" maxlength="254" autocomplete="email"></label>
+      <label>Курс<select name="course" aria-label="Курс"><option value="0">Не указан</option>${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${u.course === n ? "selected" : ""}>${n} курс</option>`).join("")}</select></label><label>Возраст<input name="age" type="number" min="1" max="120" value="${u.age || ""}" inputmode="numeric" placeholder="Не указан"></label>
+      <label class="wide">Факультет / институт<input name="faculty" value="${esc(u.faculty || "")}" maxlength="120" placeholder="Например, Институт №1"></label>
+      <label class="wide">О себе<textarea name="about" maxlength="1000" rows="3" placeholder="Интересы, любимые занятия, идеи для встреч">${esc(u.about || "")}</textarea></label>
+      <div class="profile-form-footer wide"><button class="button" type="submit">Сохранить профиль</button><span id="profile-save-status" role="status" aria-live="polite"></span></div>
+    </form></section></div>
+    <section class="profile-zone"><div class="section-head"><h2>Мои записи</h2><a class="text-link" href="/events">Выбрать мероприятие</a></div><div class="events-grid">${plans.map((e) => card(e)).join("") || '<div class="empty">Пока нет предстоящих записей. Выбери мероприятие и нажми «Приду».</div>'}</div></section>
+    <section id="visited" class="profile-zone"><div class="section-head"><h2>Архив посещений</h2><span class="helper">Только события с подтверждённым присутствием</span></div><div class="events-grid">${history.map((e) => card(e)).join("") || '<div class="empty">Здесь появятся завершённые мероприятия, на которых ты побывал. Посещение отмечает организатор.</div>'}</div></section>
+
+  </div>`;
 }
 function roof() {
   return `<div class="page"><div class="roof"><div><div class="eyebrow">ТЫ НАШЁЛ ТИХОЕ МЕСТО</div><h1>У каждого дома<br>есть свой<br><em>дружелюбный сосед.</em></h1><p>У автора этого сайта есть небольшая слабость: ему нравится Человек-паук. За остроумие, неловкость и привычку помогать, даже когда собственный день совсем не задался.</p><p>Здесь можно немного задержаться. Как на подоконнике после длинного дня — только виртуальном.</p><ul><li>Питер Паркер впервые появился в Amazing Fantasy №15 в 1962 году. Персонажа создали Стэн Ли и Стив Дитко.</li><li>В классических комиксах Питер сам разработал механические веб-шутеры. Его суперспособности и инженерные навыки — разные вещи.</li><li>Майлз Моралес впервые появился в Ultimate Fallout №4 в 2011 году. Его создатели — Брайан Майкл Бендис и Сара Пикелли.</li><li>Любимая часть этой истории: героем можно быть рядом с домом. Иногда достаточно просто заметить, что кому-то нужна помощь.</li></ul><button class="button light" data-roof>Забрать карточку «Выход на крышу» ☽</button><p class="helper">Фанатский уголок. Персонажи принадлежат Marvel.</p><a class="text-link" href="/">Вернуться к соседям</a></div><img src="/assets/roof.png" alt="Человек-паук и кот на подоконнике над городом в тёплом закатном свете"></div></div>`;
 }
 function privacy() {
-  return `<div class="page"><div class="article-body"><h1>О твоих данных</h1><p>EventsDormitory хранит идентификатор и имя аккаунта Telegram или VK, доступный ник и почту, если VK её передал. Номер комнаты, возраст и курс мы не запрашиваем. Соцсети не всегда предоставляют эти сведения.</p><p>Чтобы записаться на событие, достаточно нажать «Приду». Сохраняем связь аккаунта с мероприятием, время записи и отметку посещения. Эти данные доступны организаторам в админке; публичного списка участников нет.</p><p>Для входа используем cookie сессии. Сторонних рекламных трекеров здесь нет. Авторизация происходит на стороне выбранной соцсети — её пароль сайт не получает.</p><p>Встречи можно отменить в карточке события. Для удаления профиля и связанных записей напиши организатору <a class="text-link" href="https://t.me/Ryctam9">@Ryctam9</a>. Перед публичным запуском организаторам нужно утвердить сроки хранения и правила обработки персональных данных.</p></div></div>`;
+  return `<div class="page"><div class="article-body"><h1>О твоих данных</h1><p>EventsDormitory хранит идентификатор и имя аккаунта Telegram или VK, доступный ник и почту, если VK её передал. В личном кабинете можно добровольно заполнить имя, фамилию, почту, курс, возраст, факультет, описание и загрузить фото. Эти поля не нужны для записи на мероприятие и доступны только владельцу профиля и организаторам.</p><p>Чтобы записаться на событие, достаточно нажать «Приду». Сохраняем связь аккаунта с мероприятием, время записи и отметку посещения. Эти данные доступны организаторам в админке; публичного списка участников нет.</p><p>Для входа используем cookie сессии. Сторонних рекламных трекеров здесь нет. Авторизация происходит на стороне выбранной соцсети — её пароль сайт не получает.</p><p>Встречи можно отменить в карточке события. Для удаления профиля и связанных записей напиши организатору <a class="text-link" href="https://t.me/Ryctam9">@Ryctam9</a>. Перед публичным запуском организаторам нужно утвердить сроки хранения и правила обработки персональных данных.</p></div></div>`;
 }
 function missing() {
   return `<div class="page"><h1>Эта страница<br><em>куда-то ушла.</em></h1><p>Возможно, запись ещё не опубликована.</p><a class="button" href="/">Вернуться домой</a></div>`;
@@ -347,12 +345,12 @@ function adminPane() {
     return `<div class="admin-toolbar"><span>${items.length} записей · черновики видны только здесь</span><button class="button" data-edit="" data-kind="${adminTab}">Добавить</button></div><div class="admin-list">${items.map((e) => `<div class="admin-row"><div><strong>${esc(e.title)}</strong><small>${e.draft ? "Черновик" : "Опубликовано"} · ${esc(e.id)} ${e.date ? " · " + fmt(e.date, { day: "numeric", month: "long" }) : ""}</small></div><button class="button light" data-edit="${esc(e.id)}" data-kind="${adminTab}">Изменить</button></div>`).join("")}</div>`;
   }
   if (adminTab === "users")
-    return `<input class="search" id="user-search" placeholder="Поиск по имени, почте или ID" aria-label="Найти пользователя"><div class="table-wrap"><table><thead><tr><th>Сосед</th><th>Аккаунт / почта</th><th>Регистрация</th><th>Записи / пришёл</th></tr></thead><tbody>${Object.values(
+    return `<input class="search" id="user-search" placeholder="Поиск по имени, почте или ID" aria-label="Найти пользователя"><div class="table-wrap"><table><thead><tr><th>Сосед</th><th>Аккаунт / почта</th><th>Курс / возраст</th><th>Регистрация</th><th>Записи / пришёл</th></tr></thead><tbody>${Object.values(
       d.users,
     )
       .map(
         (u) =>
-          `<tr data-user-search="${esc((u.name + " " + u.email + " " + u.id).toLowerCase())}"><td>${esc(u.name)}</td><td>${esc(u.id)}<br>${esc(u.email || "Почта не предоставлена")}</td><td>${fmt(u.joined, { day: "numeric", month: "long", year: "numeric" })}</td><td>${d.registrations.filter((r) => r.userId === u.id).length} / ${d.registrations.filter((r) => r.userId === u.id && r.attended).length}</td></tr>`,
+          `<tr data-user-search="${esc((u.name + " " + u.email + " " + u.id).toLowerCase())}"><td>${esc(u.name)}</td><td>${esc(u.id)}<br>${esc(u.email || "Почта не предоставлена")}</td><td>${u.course ? u.course + " курс" : "Курс не указан"}<br>${u.age ? u.age + " лет" : "Возраст не указан"}<br>${esc(u.faculty || "")}</td><td>${fmt(u.joined, { day: "numeric", month: "long", year: "numeric" })}</td><td>${d.registrations.filter((r) => r.userId === u.id).length} / ${d.registrations.filter((r) => r.userId === u.id && r.attended).length}</td></tr>`,
       )
       .join("")}</tbody></table></div>`;
   return `<label for="attendance-event">Мероприятие</label> <select class="search" id="attendance-event">${d.events.map((e) => `<option value="${esc(e.id)}">${esc(e.title)}</option>`).join("")}</select><div id="attendees"></div>`;
@@ -386,7 +384,7 @@ async function render() {
         ? eventDetail(p[1])
         : events()
       : p[0] === "archive"
-        ? events(true)
+        ? profile()
         : p[0] === "blog"
           ? blog(p[1])
           : p[0] === "login"
@@ -404,20 +402,20 @@ async function render() {
                       : missing();
   document.title =
     (p[0] === "events" && p[1]
-      ? data.events.find((e) => e.id === p[1])?.title
+      ? findEvent(p[1])?.title
       : p[0] === "blog" && p[1]
         ? data.articles.find((b) => b.id === p[1])?.title
         : {
-            events: "Афиша",
+            events: "Мероприятия",
             archive: "Архив",
             blog: "Дневник",
-            profile: "Мой дневник",
+            profile: "Личный кабинет",
             achievements: "Коллекция",
             login: "Войти",
             admin: "Админка",
             roof: "Тихое место",
             privacy: "О данных",
-          }[p[0]]) || "Афиша общежития №2";
+          }[p[0]]) || "Мероприятия общежития №2";
   document.title += " · EventsDormitory";
   attendees();
 }
@@ -425,7 +423,11 @@ async function go(href) {
   history.pushState({}, "", href);
   filter = "Все";
   await render();
-  window.scrollTo(0, 0);
+  if (location.hash)
+    document
+      .getElementById(decodeURIComponent(location.hash.slice(1)))
+      ?.scrollIntoView();
+  else window.scrollTo(0, 0);
 }
 function promptLogin() {
   const d = $("#modal");
@@ -435,7 +437,7 @@ function promptLogin() {
 }
 
 async function changeCalendar(button) {
-  const archive = $(".afisha")?.dataset.archive === "true";
+  const archive = false;
   const railScroll = $(".calendar-days")?.scrollLeft || 0;
   let focus = "[data-month-reset]";
   if (button.dataset.day) {
@@ -479,7 +481,7 @@ document.addEventListener("click", async (ev) => {
     ev.preventDefault();
     $("#modal").close();
     try {
-      await go(a.pathname + a.search);
+      await go(a.pathname + a.search + a.hash);
     } catch (e) {
       toast(e.message);
     }
@@ -572,13 +574,20 @@ document.addEventListener("click", async (ev) => {
 });
 document.addEventListener("submit", async (ev) => {
   const f = ev.target;
-  if (!["admin-login", "editor"].includes(f.id)) return;
+  if (!["admin-login", "editor", "profile-form"].includes(f.id)) return;
   ev.preventDefault();
   const submit = f.querySelector("button[type=submit],button:not([type])");
   if (submit) submit.disabled = true;
   try {
     const fields = Object.fromEntries(new FormData(f));
-    if (f.id === "admin-login") {
+    if (f.id === "profile-form") {
+      fields.course = Number(fields.course);
+      fields.age = Number(fields.age || 0);
+      await api("profile", fields);
+      await refresh();
+      await render();
+      $("#profile-save-status").textContent = "Изменения сохранены";
+    } else if (f.id === "admin-login") {
       await api("admin/login", fields);
       await refresh();
       await render();
@@ -600,6 +609,48 @@ document.addEventListener("submit", async (ev) => {
   }
 });
 document.addEventListener("change", async (ev) => {
+  if (ev.target.id === "event-category") {
+    filter = ev.target.value;
+    const scroll = $(".calendar-days")?.scrollLeft || 0;
+    await render();
+    if ($(".calendar-days")) $(".calendar-days").scrollLeft = scroll;
+    $("#event-category")?.focus({ preventScroll: true });
+    return;
+  }
+  if (ev.target.id === "profile-photo") {
+    const input = ev.target,
+      file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      toast("Выбери фото до 3 МБ");
+      input.value = "";
+      return;
+    }
+    input.disabled = true;
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+      const response = await fetch("/api/profile/photo", {
+        method: "POST",
+        headers: { "X-CSRF-Token": me.csrf },
+        body: form,
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw Error(result.error || "Не удалось загрузить фото");
+      await refresh();
+      const holder = $(".profile-avatar");
+      if (holder)
+        holder.innerHTML = `<img src="${avatarURL(me.user)}" alt="Фото профиля">`;
+      toast("Фото сохранено");
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      input.disabled = false;
+      input.value = "";
+    }
+    return;
+  }
   if (ev.target.id === "attendance-event") {
     attendees();
     return;

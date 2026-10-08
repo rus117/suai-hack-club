@@ -145,7 +145,7 @@ func (a *App) auth(w http.ResponseWriter, r *http.Request) {
 			if info.User.ID == "" {
 				err = fmt.Errorf("missing identity")
 			}
-			u = User{ID: "vk:" + string(info.User.ID), Name: strings.TrimSpace(info.User.First + " " + info.User.Last), Email: info.User.Email, Provider: "vk"}
+			u = User{ID: "vk:" + string(info.User.ID), Name: strings.TrimSpace(info.User.First + " " + info.User.Last), FirstName: info.User.First, LastName: info.User.Last, Email: info.User.Email, Provider: "vk"}
 		}
 	}
 	if err != nil {
@@ -158,8 +158,7 @@ func (a *App) auth(w http.ResponseWriter, r *http.Request) {
 	err = a.mutate(func() {
 		old, exists := a.db.Users[u.ID]
 		if exists {
-			u.Joined = old.Joined
-			u.Actions = old.Actions
+			u = preserveProfile(u, old)
 		} else {
 			u.Joined = time.Now().Format(time.RFC3339)
 			u.Actions = map[string]bool{}
@@ -249,6 +248,8 @@ func (a *App) telegramUser(jwt, clientID string) (User, error) {
 		Audience json.RawMessage `json:"aud"`
 		Sub      string          `json:"sub"`
 		Name     string          `json:"name"`
+		Given    string          `json:"given_name"`
+		Family   string          `json:"family_name"`
 		Username string          `json:"preferred_username"`
 		Expires  int64           `json:"exp"`
 		Issued   int64           `json:"iat"`
@@ -270,5 +271,5 @@ func (a *App) telegramUser(jwt, clientID string) (User, error) {
 	if c.Issuer != "https://oauth.telegram.org" || aud != clientID || c.Sub == "" || c.Expires <= time.Now().Unix() || c.Issued > time.Now().Unix()+60 {
 		return User{}, bad
 	}
-	return User{ID: "telegram:" + c.Sub, Name: c.Name, Provider: "telegram", Username: c.Username}, nil
+	return User{ID: "telegram:" + c.Sub, Name: c.Name, FirstName: c.Given, LastName: c.Family, Provider: "telegram", Username: c.Username}, nil
 }

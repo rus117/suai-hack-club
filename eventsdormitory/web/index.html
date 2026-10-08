@@ -8,7 +8,7 @@
       name="description"
       content="Дневник общежития №2 ГУАП: мероприятия, истории соседей и встречи на Передовиков, 13."
     />
-    <title>EventsDormitory — афиша общежития №2</title>
+    <title>EventsDormitory — мероприятия общежития №2</title>
     <link
       rel="preload"
       href="/assets/fonts/Onest.ttf"
@@ -24,21 +24,54 @@
       crossorigin
     />
     <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/zones.css" />
     <script defer src="/calendar.js"></script>
     <script defer src="/app.js"></script>
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="/" aria-label="EventsDormitory — главная"
-        ><span class="brand-icon">Ⅱ</span
-        ><span
-          >Events<span class="brand-serif">Dormitory</span
-          ><small>ПЕРЕДОВИКОВ, 13</small></span
-        ></a
-      >
+        ><svg
+          class="brand-mark"
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 240 116"
+          fill="none"
+        >
+          <path
+            d="M16 103 13 52 112 12 165 42 171 12 189 15 194 55 223 70 225 106 152 108 76 106Z"
+            stroke="#233545"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <text
+            x="44"
+            y="61"
+            fill="#233545"
+            font-family="Caveat, Segoe Print, cursive"
+            font-size="38"
+            font-weight="600"
+            transform="rotate(-2 105 54)"
+          >
+            Events
+          </text>
+          <text
+            x="29"
+            y="94"
+            fill="#233545"
+            font-family="Caveat, Segoe Print, cursive"
+            font-size="41"
+            font-weight="600"
+            transform="rotate(1 120 87)"
+          >
+            Dormitory
+          </text>
+        </svg>
+      </a>
       <nav aria-label="Главная навигация">
-        <a href="/events">Афиша</a><a href="/blog">Дневник</a
-        ><a href="/achievements">Коллекция</a><a href="/archive">Архив</a>
+        <a href="/events">Мероприятия</a><a href="/blog">Дневник</a
+        ><a href="/achievements">Коллекция</a>
       </nav>
       <a class="login-link" id="account-link" href="/login">Войти</a>
     </header>

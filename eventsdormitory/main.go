@@ -38,13 +38,21 @@ type Article struct {
 	Draft    bool   `json:"draft"`
 }
 type User struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Provider string          `json:"provider"`
-	Email    string          `json:"email,omitempty"`
-	Username string          `json:"username,omitempty"`
-	Joined   string          `json:"joined"`
-	Actions  map[string]bool `json:"actions"`
+	ID             string          `json:"id"`
+	Name           string          `json:"name"`
+	Provider       string          `json:"provider"`
+	Email          string          `json:"email,omitempty"`
+	Username       string          `json:"username,omitempty"`
+	Joined         string          `json:"joined"`
+	Actions        map[string]bool `json:"actions"`
+	FirstName      string          `json:"firstName,omitempty"`
+	LastName       string          `json:"lastName,omitempty"`
+	Course         int             `json:"course,omitempty"`
+	Age            int             `json:"age,omitempty"`
+	Faculty        string          `json:"faculty,omitempty"`
+	About          string          `json:"about,omitempty"`
+	Avatar         string          `json:"avatar,omitempty"`
+	ProfileUpdated bool            `json:"profileUpdated,omitempty"`
 }
 type Registration struct {
 	UserID   string `json:"userId"`
@@ -232,8 +240,12 @@ func (a *App) routes() http.Handler {
 			http.Error(w, "Method not allowed", 405)
 			return
 		}
-		if r.URL.Path == "/style.css" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" {
+		if r.URL.Path == "/style.css" || r.URL.Path == "/zones.css" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" {
 			http.ServeFile(w, r, "web"+r.URL.Path)
+			return
+		}
+		if r.URL.Path == "/archive" {
+			http.Redirect(w, r, "/profile#visited", http.StatusSeeOther)
 			return
 		}
 		if r.URL.Path == "/healthz" {
@@ -283,7 +295,8 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 		events := []Event{}
 		articles := []Article{}
 		for _, e := range a.db.Events {
-			if !e.Draft {
+			date, err := time.Parse(time.RFC3339, e.Date)
+			if !e.Draft && err == nil && date.After(time.Now()) {
 				events = append(events, e)
 			}
 		}
@@ -308,7 +321,27 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 		if x, ok := a.db.Users[s.UserID]; ok {
 			u = x
 		}
-		respond(w, 200, map[string]any{"user": u, "admin": s.Admin, "csrf": s.CSRF, "registrations": regs})
+		history := []Event{}
+		for _, reg := range regs {
+			if !reg.Attended {
+				continue
+			}
+			for _, e := range a.db.Events {
+				date, err := time.Parse(time.RFC3339, e.Date)
+				if e.ID == reg.EventID && err == nil && !date.After(time.Now()) {
+					history = append(history, e)
+				}
+			}
+		}
+		respond(w, 200, map[string]any{"user": u, "admin": s.Admin, "csrf": s.CSRF, "registrations": regs, "history": history})
+	case p == "profile" && r.Method == "POST":
+		if s.UserID == "" {
+			fail(w, 401, "Сначала войдите в профиль")
+			return
+		}
+		a.updateProfile(w, r, s.UserID)
+	case p == "profile/photo" && (r.Method == "GET" || r.Method == "POST"):
+		a.profilePhoto(w, r, s)
 	case p == "demo/login" && r.Method == "POST":
 		if !a.demo {
 			fail(w, 404, "Демонстрационный вход выключен")

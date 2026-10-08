@@ -1,0 +1,21 @@
+name: EventsDormitory Go
+on:
+  push:
+    paths: ['eventsdormitory/**', '.github/workflows/eventsdormitory.yml']
+  pull_request:
+    paths: ['eventsdormitory/**', '.github/workflows/eventsdormitory.yml']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eventsdormitory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: false
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: go build ./...

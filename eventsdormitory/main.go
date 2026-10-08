@@ -367,6 +367,14 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "Запись на это событие закрыта")
 			return
 		}
+		if b.Cancel {
+			for _, v := range a.db.Registrations {
+				if v.UserID == s.UserID && v.EventID == b.EventID && v.Attended {
+					fail(w, 409, "Посещение уже подтверждено. Если отметка ошибочна, напишите организатору.")
+					return
+				}
+			}
+		}
 		err := a.mutate(func() {
 			out := []Registration{}
 			found := false

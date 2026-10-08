@@ -71,6 +71,9 @@ func TestRegistrationLifecycleAndPersistence(t *testing.T) {
 	if w.Code != 200 || !a.db.Registrations[0].Attended {
 		t.Fatal("attendance not saved")
 	}
+	if w := call(a, "POST", "register", map[string]any{"eventId": "future", "cancel": true}, c, csrf, a.origin); w.Code != 409 {
+		t.Fatal("confirmed attendance cancellation reported success")
+	}
 	w = call(a, "POST", "admin/attendance", map[string]any{"eventId": "future", "userId": "demo:neighbor", "attended": false}, admin, ac, a.origin)
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())

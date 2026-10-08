@@ -254,15 +254,30 @@ function blog(id) {
   if (id) {
     const b = data.articles.find((x) => x.id === id);
     if (!b) return missing();
-    const index = data.articles.findIndex((x) => x.id === id),
+    const spread = DormJournal[id],
+      index = data.articles.findIndex((x) => x.id === id),
       next = data.articles[index + 1];
-    return `<div class="diary-page diary-reading"><div class="page"><div class="breadcrumb"><a href="/blog">К разложенным страницам</a></div>
-      <article class="diary-full paper-surface"><div class="paper-heading"><span>${esc(b.category)}</span><span>Лист ${String(index + 1).padStart(2, "0")}</span></div><h1>${esc(b.title)}</h1><p class="diary-lede">${esc(b.intro)}</p><figure class="diary-photo"><img src="${esc(b.image)}" alt="Иллюстрация к записи ${esc(b.title)}"></figure><div class="diary-full-text">${paras(b.body)}</div><div class="diary-end"><button class="button light" data-read>Прочитал</button>${next ? `<a class="text-link" href="/blog/${esc(next.id)}">Следующая страница</a>` : '<a class="text-link" href="/blog">Все страницы</a>'}</div></article>
+    return `<div class="journal-page"><div class="page journal-entry"><h1 class="visually-hidden">${esc(b.title)}</h1><div class="journal-bar"><a class="text-link" href="/blog">Все развороты</a><span>${esc(b.category)}</span>${spread ? `<button class="button light" data-spread-zoom="${esc(id)}">Увеличить разворот</button>` : ""}</div>
+      ${spread ? `<button class="spread-view" data-spread-zoom="${esc(id)}" aria-label="Увеличить разворот: ${esc(spread.title)}"><img src="${spread.image}" alt="Открытый дневник: ${esc(spread.title)}. Текстовая версия доступна ниже."></button>` : `<article class="journal-fallback"><h2>${esc(b.title)}</h2><img src="${esc(b.image)}" alt=""><div>${paras(b.body)}</div></article>`}
+      ${spread ? `<details class="journal-transcript"><summary>Прочитать текст разворота</summary><div><h2>${esc(spread.title)}</h2>${spread.notes.map((t) => `<p>${esc(t)}</p>`).join("")}</div></details>` : ""}
+      <details class="journal-transcript"><summary>Дополнительно по теме</summary><div>${paras(b.body)}</div></details><div class="journal-next"><button class="button light" data-read>Прочитал</button>${next ? `<a class="text-link" href="/blog/${esc(next.id)}">Следующий разворот</a>` : '<a class="text-link" href="/blog">К началу дневника</a>'}</div>
     </div></div>`;
   }
-  return `<div class="diary-page"><div class="page"><div class="diary-introduction"><h1>Дневник общежития</h1><p>Заметки, идеи и небольшие истории. Нажми на лист, чтобы прочитать запись целиком.</p></div>
-    <div class="diary-scatter">${data.articles.map((b, index) => `<article class="diary-sheet paper-surface sheet-${index % 3}"><div class="paper-heading"><span>${esc(b.category)}</span><span>${String(index + 1).padStart(2, "0")}</span></div><h2><a class="sheet-link" href="/blog/${esc(b.id)}">${esc(b.title)}</a></h2>${index % 3 === 0 ? `<figure class="diary-photo"><img src="${esc(b.image)}" alt="" loading="lazy"></figure>` : ""}<p>${esc(b.intro)}</p>${index % 3 === 2 ? '<div class="paper-doodle" aria-hidden="true">ноутбук ✓<br>зарядка ✓<br>начать с малого</div>' : ""}<span class="paper-open">Развернуть запись</span></article>`).join("")}</div>
-  </div></div>`;
+  return `<div class="journal-page"><div class="page"><div class="journal-intro"><h1>Дневник общежития</h1><p>Рисунки и заметки о жизни на Передовиков. Выбери тему и открой разворот.</p></div><div class="journal-library">${data.articles
+    .map((b, i) => {
+      const spread = DormJournal[b.id];
+      return `<article class="journal-preview ${i === 0 ? "journal-featured" : ""}"><a href="/blog/${esc(b.id)}" class="journal-preview-link" aria-label="Открыть разворот: ${esc(spread?.title || b.title)}"><img src="${esc(spread?.image || b.image)}" alt="" ${i ? 'loading="lazy"' : ""}><div class="journal-caption"><span>${esc(b.category)}</span><h2>${esc(spread?.title || b.title)}</h2><span class="journal-open">Открыть разворот</span></div></a></article>`;
+    })
+    .join("")}</div></div></div>`;
+}
+function openSpread(id) {
+  const spread = DormJournal[id];
+  if (!spread) return;
+  const modal = $("#modal");
+  modal.classList.add("journal-dialog");
+  $("#modal-content").innerHTML =
+    `<div class="journal-zoom-toolbar"><h2>${esc(spread.title)}</h2><div><button class="chip active" data-spread-scale="1" aria-pressed="true">100%</button><button class="chip" data-spread-scale="2" aria-pressed="false">200%</button><button class="chip" data-spread-scale="3" aria-pressed="false">300%</button></div></div><div class="journal-zoom-frame" data-scale="1"><img src="${spread.image}" alt="${esc(spread.title)}"></div><a class="text-link" href="${spread.image}" target="_blank" rel="noopener">Открыть изображение отдельно</a>`;
+  modal.showModal();
 }
 function login() {
   const err = new URLSearchParams(location.search).get("error");
@@ -474,6 +489,8 @@ document.addEventListener("click", async (ev) => {
   if (
     a &&
     a.origin === location.origin &&
+    a.target !== "_blank" &&
+    !a.hasAttribute("download") &&
     !a.pathname.startsWith("/auth/") &&
     !ev.ctrlKey &&
     !ev.metaKey
@@ -494,6 +511,19 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   try {
+    if (b.dataset.spreadZoom) {
+      openSpread(b.dataset.spreadZoom);
+      return;
+    }
+    if (b.dataset.spreadScale) {
+      $(".journal-zoom-frame").dataset.scale = b.dataset.spreadScale;
+      document.querySelectorAll("[data-spread-scale]").forEach((x) => {
+        const active = x.dataset.spreadScale === b.dataset.spreadScale;
+        x.classList.toggle("active", active);
+        x.setAttribute("aria-pressed", String(active));
+      });
+      return;
+    }
     if (
       b.dataset.day ||
       b.dataset.month ||
@@ -693,3 +723,7 @@ refresh()
       '<div class="page"><h1>Не удалось открыть дневник</h1><p>Обнови страницу через минуту.</p></div>';
     toast(e.message);
   });
+
+$("#modal").addEventListener("close", () =>
+  $("#modal").classList.remove("journal-dialog"),
+);

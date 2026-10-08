@@ -240,7 +240,7 @@ func (a *App) routes() http.Handler {
 			http.Error(w, "Method not allowed", 405)
 			return
 		}
-		if r.URL.Path == "/style.css" || r.URL.Path == "/zones.css" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" {
+		if r.URL.Path == "/style.css" || r.URL.Path == "/zones.css" || r.URL.Path == "/journal.css" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" || r.URL.Path == "/journal.js" {
 			http.ServeFile(w, r, "web"+r.URL.Path)
 			return
 		}

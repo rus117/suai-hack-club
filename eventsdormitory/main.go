@@ -65,6 +65,7 @@ type Database struct {
 	Articles      []Article       `json:"articles"`
 	Users         map[string]User `json:"users"`
 	Registrations []Registration  `json:"registrations"`
+	Proposals     []Proposal      `json:"proposals"`
 }
 type Session struct {
 	UserID  string
@@ -240,7 +241,7 @@ func (a *App) routes() http.Handler {
 			http.Error(w, "Method not allowed", 405)
 			return
 		}
-		if r.URL.Path == "/style.css" || r.URL.Path == "/zones.css" || r.URL.Path == "/journal.css" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" || r.URL.Path == "/journal.js" {
+		if r.URL.Path == "/style.css" || r.URL.Path == "/zones.css" || r.URL.Path == "/journal.css" || r.URL.Path == "/book.css" || r.URL.Path == "/book.js" || r.URL.Path == "/page-curl.js" || r.URL.Path == "/app.js" || r.URL.Path == "/calendar.js" || r.URL.Path == "/journal.js" {
 			http.ServeFile(w, r, "web"+r.URL.Path)
 			return
 		}
@@ -333,7 +334,22 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		respond(w, 200, map[string]any{"user": u, "admin": s.Admin, "csrf": s.CSRF, "registrations": regs, "history": history})
+		proposals := []Proposal{}
+		proposedEvents := []Event{}
+		for _, proposal := range a.db.Proposals {
+			if proposal.UserID != s.UserID {
+				continue
+			}
+			proposals = append(proposals, proposal)
+			for _, event := range a.db.Events {
+				if event.ID == proposal.EventID && !event.Draft {
+					proposedEvents = append(proposedEvents, event)
+				}
+			}
+		}
+		respond(w, 200, map[string]any{"user": u, "admin": s.Admin, "csrf": s.CSRF, "registrations": regs, "history": history, "proposals": proposals, "proposedEvents": proposedEvents})
+	case p == "proposal" && r.Method == "POST":
+		a.createProposal(w, r, s)
 	case p == "profile" && r.Method == "POST":
 		if s.UserID == "" {
 			fail(w, 401, "Сначала войдите в профиль")
@@ -484,6 +500,8 @@ func validImage(s string) bool {
 }
 func (a *App) admin(w http.ResponseWriter, r *http.Request, p string) {
 	switch {
+	case p == "proposal" && r.Method == "POST":
+		a.reviewProposal(w, r)
 	case p == "data" && r.Method == "GET":
 		respond(w, 200, a.db)
 	case p == "event" && r.Method == "POST":

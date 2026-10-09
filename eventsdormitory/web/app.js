@@ -173,6 +173,10 @@ function afisha(archive = false, level = 1) {
   </div>`;
 }
 const badges = [
+  {id: "sport", title: "На площадке", text: "Посетить спортивное событие", category: "Спорт"},
+  {id: "creative", title: "Творческий беспорядок", text: "Посетить творческую встречу", category: "Творчество"},
+  {id: "together", title: "Чай с соседями", text: "Посетить встречу из категории «Вместе»", category: "Вместе"},
+  {id: "ten", title: "Легенда общежития", text: "Побывать на десяти событиях", goal: 10},
   {
     id: "first",
     icon: "✦",
@@ -216,6 +220,7 @@ const badges = [
     action: "roof",
   },
 ];
+badges.sort((a,b) => ["first","three","five","tech","sport","creative","together","read","roof","ten"].indexOf(a.id) - ["first","three","five","tech","sport","creative","together","read","roof","ten"].indexOf(b.id));
 function unlocked(b) {
   const attended = (me.registrations || []).filter((r) => r.attended);
   return b.goal
@@ -224,9 +229,10 @@ function unlocked(b) {
       ? attended.some((r) => findEvent(r.eventId)?.category === b.category)
       : !!me.user?.actions?.[b.action];
 }
-function badge(b, mini = false) {
+function badge(b, mini = false, album = false) {
   const yes = unlocked(b);
-  return `<div class="achievement-card ${!mini && !yes ? "locked" : ""}"><small class="badge-status">${mini ? "КАРТА СОСЕДА" : yes ? "В коллекции" : "Ещё впереди"}</small><span class="achievement-icon" aria-hidden="true"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="/assets/cards.svg#${b.id}"></use></svg></span><h3>${esc(b.title)}</h3>${mini ? "" : `<p>${esc(b.text)}</p>`}</div>`;
+  if (album) return `<article class="album-slot ${yes ? "album-earned" : "album-empty"}"><div class="album-pocket"><span class="album-corner corner-tl" aria-hidden="true"></span><span class="album-corner corner-tr" aria-hidden="true"></span><span class="album-corner corner-bl" aria-hidden="true"></span><span class="album-corner corner-br" aria-hidden="true"></span><img src="/assets/achievements/${b.id}.webp" alt="${yes ? "Карточка достижения: " + esc(b.title) : ""}" loading="lazy" width="320" height="480">${yes ? '<span class="album-stamp">В коллекции ✓</span>' : '<span class="album-placeholder" aria-hidden="true">Место для<br>твоей карточки</span>'}</div><div class="album-label"><small>${String(badges.indexOf(b) + 1).padStart(2, "0")} / 10 · ${yes ? "Собрано" : "Ещё впереди"}</small><h3>${esc(b.title)}</h3><p>${esc(b.text)}</p></div></article>`;
+  return `<div class="achievement-card ${!mini && !yes ? "locked" : ""}"><small class="badge-status">${mini ? "КАРТА СОСЕДА" : yes ? "В коллекции" : "Ещё впереди"}</small><span class="achievement-icon" aria-hidden="true"><img src="/assets/achievements/${b.id}.webp" alt="" loading="lazy" width="320" height="480"></span><h3>${esc(b.title)}</h3>${mini ? "" : `<p>${esc(b.text)}</p>`}</div>`;
 }
 function home() {
   return `<div class="hero-landing"><div class="hero-illustration" role="img" aria-label="Рисунок общежития №2 ГУАП на Передовиков, 13"></div>
@@ -251,24 +257,8 @@ function eventDetail(id) {
   return `<div class="page"><div class="breadcrumb"><a href="/events">Мероприятия</a> / ${esc(e.category)}</div><div class="detail"><img src="${esc(e.image)}" alt="${esc(e.title)}"><div><div class="eyebrow">${esc(e.category)} · ${closed ? "В АРХИВЕ" : "ПРЕДСТОЯЩЕЕ СОБЫТИЕ"}</div><h1>${esc(e.title)}</h1><p class="lede">${esc(e.intro)}</p><div class="fact-row"><span>Когда</span><strong>${fmt(e.date, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} МСК</strong></div><div class="fact-row"><span>Где</span><span>${esc(e.place)}</span></div><div class="fact-row"><span>Кто собирает</span><span>Инициативные люди</span></div><div class="buttons">${closed ? '<span class="helper">Встреча завершена, запись закрыта.</span>' : `<button class="button" data-register="${esc(id)}" data-cancel="${registered}">${registered ? "Отменить запись" : "Приду"} <span>${registered ? "×" : ""}</span></button>${registered ? '<span class="helper">Ты в списке. До встречи!</span>' : '<span class="helper">Запись в один клик.</span>'}`}</div></div></div><div class="article-body">${paras(e.body)}</div></div>`;
 }
 function blog(id) {
-  if (id) {
-    const b = data.articles.find((x) => x.id === id);
-    if (!b) return missing();
-    const spread = DormJournal[id],
-      index = data.articles.findIndex((x) => x.id === id),
-      next = data.articles[index + 1];
-    return `<div class="journal-page"><div class="page journal-entry"><h1 class="visually-hidden">${esc(b.title)}</h1><div class="journal-bar"><a class="text-link" href="/blog">Все развороты</a><span>${esc(b.category)}</span>${spread ? `<button class="button light" data-spread-zoom="${esc(id)}">Увеличить разворот</button>` : ""}</div>
-      ${spread ? `<button class="spread-view" data-spread-zoom="${esc(id)}" aria-label="Увеличить разворот: ${esc(spread.title)}"><img src="${spread.image}" alt="Открытый дневник: ${esc(spread.title)}. Текстовая версия доступна ниже."></button>` : `<article class="journal-fallback"><h2>${esc(b.title)}</h2><img src="${esc(b.image)}" alt=""><div>${paras(b.body)}</div></article>`}
-      ${spread ? `<details class="journal-transcript"><summary>Прочитать текст разворота</summary><div><h2>${esc(spread.title)}</h2>${spread.notes.map((t) => `<p>${esc(t)}</p>`).join("")}</div></details>` : ""}
-      <details class="journal-transcript"><summary>Дополнительно по теме</summary><div>${paras(b.body)}</div></details><div class="journal-next"><button class="button light" data-read>Прочитал</button>${next ? `<a class="text-link" href="/blog/${esc(next.id)}">Следующий разворот</a>` : '<a class="text-link" href="/blog">К началу дневника</a>'}</div>
-    </div></div>`;
-  }
-  return `<div class="journal-page"><div class="page"><div class="journal-intro"><h1>Дневник общежития</h1><p>Рисунки и заметки о жизни на Передовиков. Выбери тему и открой разворот.</p></div><div class="journal-library">${data.articles
-    .map((b, i) => {
-      const spread = DormJournal[b.id];
-      return `<article class="journal-preview ${i === 0 ? "journal-featured" : ""}"><a href="/blog/${esc(b.id)}" class="journal-preview-link" aria-label="Открыть разворот: ${esc(spread?.title || b.title)}"><img src="${esc(spread?.image || b.image)}" alt="" ${i ? 'loading="lazy"' : ""}><div class="journal-caption"><span>${esc(b.category)}</span><h2>${esc(spread?.title || b.title)}</h2><span class="journal-open">Открыть разворот</span></div></a></article>`;
-    })
-    .join("")}</div></div></div>`;
+  if (id && !["guide", "collection", "stories"].includes(id) && !data.articles.some(b => b.id === id)) return missing();
+  return DormBook.render({data, me, badges, badge, unlocked, esc, paras, fmt, id});
 }
 function openSpread(id) {
   const spread = DormJournal[id];
@@ -284,7 +274,7 @@ function login() {
   return `<div class="page"><div class="auth-card"><div class="eyebrow">ПРИВЕТ, СОСЕД</div><h1>Войти в профиль</h1><p>Войди, чтобы записываться на встречи, отменять планы и собирать карточки достижений.</p>${err ? '<div class="note">Вход не завершён. Попробуй снова. Если ошибка повторяется, напиши организаторам.</div>' : ""}${["telegram", "vk"].map((p) => (data.auth[p] ? `<a class="auth-option" href="/auth/${p}">Войти через ${p === "vk" ? "VK" : "Telegram"}</a>` : `<div class="auth-option disabled">${p === "vk" ? "VK" : "Telegram"}<small>Организаторы ещё подключают вход</small></div>`)).join("")}${data.auth.demo ? '<button class="button light" data-demo>Попробовать демопрофиль</button><p class="helper">Локальная демонстрация, не аккаунт соцсети.</p>' : ""}<p class="helper">Получаем имя и идентификатор аккаунта, а VK может передать почту. Курс и возраст автоматически не определяем.</p><a class="text-link" href="/privacy">Как храним данные</a></div></div>`;
 }
 function achievements() {
-  return `<div class="page"><h1>Коллекция достижений</h1><p class="page-intro">Карточки открываются за посещение мероприятий. Организатор подтверждает участие в админке; результат появляется в твоём профиле.</p><div class="achievement-grid">${badges.map((b) => badge(b)).join("")}</div><div class="note">За реальные посещения — четыре карточки. Ещё две прячутся в дневнике и в одном тихом месте сайта. ${me.user ? "Твои открытые карты уже отмечены." : '<a class="text-link" href="/login">Войди, чтобы начать коллекцию</a>'}</div></div>`;
+  return `<div class="page"><h1>Коллекция достижений</h1><p class="page-intro">Карточки открываются за посещение мероприятий. Организатор подтверждает участие в админке; результат появляется в твоём профиле.</p><div class="achievement-grid">${badges.map((b) => badge(b)).join("")}</div><div class="note">В коллекции десять карточек: восемь за подтверждённые посещения, две — за чтение дневника и открытие тихого уголка. ${me.user ? "Твои открытые карты уже отмечены." : '<a class="text-link" href="/login">Войди, чтобы начать коллекцию</a>'}</div></div>`;
 }
 function avatarURL(u) {
   return u.avatar
@@ -344,6 +334,7 @@ function admin() {
   return `<div class="page"><div class="profile-top"><div><div class="eyebrow">АДМИНКА</div><h1>Комната организаторов</h1></div><button class="button light" data-logout>Выйти</button></div><div class="stats"><div><strong>${Object.keys(d.users).length}</strong><span>аккаунтов</span></div><div><strong>${d.registrations.length}</strong><span>записей</span></div><div><strong>${d.registrations.filter((r) => r.attended).length}</strong><span>посещений</span></div></div><div class="admin-tabs">${[
     ["events", "Мероприятия"],
     ["articles", "Статьи"],
+    ["proposals", "Идеи соседей"],
     ["attendance", "Посещения"],
     ["users", "Пользователи"],
   ]
@@ -359,6 +350,7 @@ function adminPane() {
     const items = d[adminTab];
     return `<div class="admin-toolbar"><span>${items.length} записей · черновики видны только здесь</span><button class="button" data-edit="" data-kind="${adminTab}">Добавить</button></div><div class="admin-list">${items.map((e) => `<div class="admin-row"><div><strong>${esc(e.title)}</strong><small>${e.draft ? "Черновик" : "Опубликовано"} · ${esc(e.id)} ${e.date ? " · " + fmt(e.date, { day: "numeric", month: "long" }) : ""}</small></div><button class="button light" data-edit="${esc(e.id)}" data-kind="${adminTab}">Изменить</button></div>`).join("")}</div>`;
   }
+  if (adminTab === "proposals") return proposalReviews(d);
   if (adminTab === "users")
     return `<input class="search" id="user-search" placeholder="Поиск по имени, почте или ID" aria-label="Найти пользователя"><div class="table-wrap"><table><thead><tr><th>Сосед</th><th>Аккаунт / почта</th><th>Курс / возраст</th><th>Регистрация</th><th>Записи / пришёл</th></tr></thead><tbody>${Object.values(
       d.users,
@@ -369,6 +361,11 @@ function adminPane() {
       )
       .join("")}</tbody></table></div>`;
   return `<label for="attendance-event">Мероприятие</label> <select class="search" id="attendance-event">${d.events.map((e) => `<option value="${esc(e.id)}">${esc(e.title)}</option>`).join("")}</select><div id="attendees"></div>`;
+}
+function proposalReviews(d) {
+  const proposals = (d.proposals || []).slice().reverse();
+  const statuses = {pending: "На рассмотрении", accepted: "В афише", declined: "Пока не принято"};
+  return `<p class="helper">Сначала создайте и опубликуйте мероприятие, затем свяжите его с идеей соседа. История появится только в дневнике автора.</p>${proposals.map(p => `<article class="proposal-review"><h3>${esc(p.title)}</h3><p class="helper">${esc(d.users[p.userId]?.name || "Сосед")} · ${fmt(p.created, {day:"numeric", month:"long"})}</p>${paras(p.body)}<form class="proposal-review-form"><input type="hidden" name="id" value="${esc(p.id)}"><label>Ответ<select name="status">${Object.entries(statuses).map(([key,label]) => `<option value="${key}" ${p.status === key ? "selected" : ""}>${label}</option>`).join("")}</select></label><label>Мероприятие<select name="eventId"><option value="">Выберите событие</option>${d.events.filter(e => !e.draft).map(e => `<option value="${esc(e.id)}" ${p.eventId === e.id ? "selected" : ""}>${esc(e.title)}</option>`).join("")}</select></label><button type="submit" class="button">Сохранить ответ</button></form></article>`).join("") || '<div class="empty">Идей пока нет. Они появятся, когда сосед заполнит форму в дневнике.</div>'}`;
 }
 function attendees() {
   const id = $("#attendance-event")?.value;
@@ -419,7 +416,7 @@ async function render() {
     (p[0] === "events" && p[1]
       ? findEvent(p[1])?.title
       : p[0] === "blog" && p[1]
-        ? data.articles.find((b) => b.id === p[1])?.title
+        ? data.articles.find((b) => b.id === p[1])?.title || ({guide: "Гайд общежития", collection: "Мои ачивки", stories: "Мои мероприятия"}[p[1]])
         : {
             events: "Мероприятия",
             archive: "Архив",
@@ -511,6 +508,7 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   try {
+    if (DormBook.handle(b)) return;
     if (b.dataset.spreadZoom) {
       openSpread(b.dataset.spreadZoom);
       return;
@@ -594,6 +592,7 @@ document.addEventListener("click", async (ev) => {
       const action = b.hasAttribute("data-read") ? "read" : "roof";
       await api("action", { action });
       await refresh();
+      await render();
       toast("Новая карточка в твоей коллекции ♡");
     }
   } catch (e) {
@@ -604,13 +603,26 @@ document.addEventListener("click", async (ev) => {
 });
 document.addEventListener("submit", async (ev) => {
   const f = ev.target;
-  if (!["admin-login", "editor", "profile-form"].includes(f.id)) return;
+  const formKind = f.classList.contains("proposal-review-form") ? "proposal-review" : f.id;
+  if (!["admin-login", "editor", "profile-form", "proposal-form", "proposal-review"].includes(formKind)) return;
   ev.preventDefault();
   const submit = f.querySelector("button[type=submit],button:not([type])");
   if (submit) submit.disabled = true;
   try {
     const fields = Object.fromEntries(new FormData(f));
-    if (f.id === "profile-form") {
+    if (formKind === "proposal-form") {
+      await api("proposal", fields);
+      await refresh();
+      await render();
+      $("#proposal-status").textContent = "Идея отправлена организаторам. Следи за ответом на следующих страницах.";
+      $("#proposal-status").focus();
+      toast("Идея сохранена в дневнике");
+    } else if (formKind === "proposal-review") {
+      await api("admin/proposal", fields);
+      await refresh();
+      await render();
+      toast("Ответ сохранён");
+    } else if (f.id === "profile-form") {
       fields.course = Number(fields.course);
       fields.age = Number(fields.age || 0);
       await api("profile", fields);
